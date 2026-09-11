@@ -199,17 +199,16 @@ function signsFor (sub) {
 /**
  * Does somebody have to put their name to this document at this stage?
  *
- * The project manager signs both, because reviewing a bill and saying so is
- * still reviewing it. The last stage is the HOD's signature being placed,
- * and an invoice has no HOD signature on it — so for an invoice there is
- * nothing at that stage to do, and it should never have been sent to the PA
- * in the first place. See docs/BDOS-CCS-Endpoints.md: an approved invoice
- * ought to finish at the HOD.
+ * Only the time sheet is ever signed by an approver: the project manager
+ * in the REVIEWED BY box, the HOD's signature placed by the PA at the end.
+ * An invoice carries one signature, the consultant's own, and nobody in the
+ * queue adds to it — an approver approving a bill is approving it, not
+ * signing it. So an invoice is passed on with a decision and nothing else,
+ * and should never reach the PA at all. See docs/BDOS-CCS-Endpoints.md: an
+ * approved invoice ought to finish at the HOD.
  */
 function mustSign (sub) {
-  if (!signingStage(sub.status)) return false;
-  if (sub.status === 'pending_signature' && kindOf(sub) !== 'claim') return false;
-  return true;
+  return signingStage(sub.status) && kindOf(sub) === 'claim';
 }
 
 /** is the PA's stage even a thing for this document? */
@@ -691,9 +690,11 @@ async function bulk (waiting, action, note) {
     toast('Say why — every one of them gets sent back with this note.', true);
     return;
   }
-  /* A document with a box can be signed in bulk, using the signature this
-     machine remembers. One without — an invoice — needs a scan that only a
-     person can produce, so it is left where it is and said so. */
+  /* A time sheet can be signed in bulk, using the signature this machine
+     remembers; an invoice is not signed at all, so it simply goes. A stage
+     that signs a document with no box to draw in would need a scan only a
+     person can produce — none exists today, but were one added it would be
+     left where it is and said so. */
   const needsScan = action === 'approve'
     ? waiting.filter(s => mustSign(s) && !signsFor(s)) : [];
   const canDo = waiting.filter(s => needsScan.indexOf(s) < 0);
@@ -778,6 +779,8 @@ function decideBox (sub) {
     : decideAction === 'resubmit' ? 'Send this document back for approval'
     : signs ? 'Sign and approve'
     : signing ? `Sign the ${kindLabel(kindOf(sub)).toLowerCase()} and pass it on`
+    : kindOf(sub) !== 'claim' && sub.status !== 'pending_signature'
+      ? 'Approve the invoice — there is nothing on it for an approver to sign'
     : sub.status === 'pending_signature'
       ? 'Close the invoice — there is no signature to place on one'
       : `Approve the ${kindLabel(kindOf(sub)).toLowerCase()}`;

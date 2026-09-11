@@ -119,13 +119,15 @@ check('only the time sheet gets signed by an approver',
 check('the stages are drawn in the order they happen',
   /'pending_manager'[\s\S]{0,200}'pending_boss'[\s\S]{0,200}'pending_signature'/
     .test(approvals), true);
-/* The project manager puts their name to a document before it goes any
-   further — drawn in the app where there is a box, uploaded as a scan where
-   there is not. Approving without either was how a bill reached the HOD with
-   nobody's name on it. */
-check('a stage that signs will not pass anything on unsigned',
+/* The project manager puts their name to a time sheet before it goes any
+   further — drawn in the app, or signed on paper and uploaded as a scan. An
+   invoice is the exception: it carries the consultant's signature and nobody
+   else's, so approving one asks for nothing to be uploaded. */
+check('a stage that signs will not pass a time sheet on unsigned',
   /if \(signing && signs && pad\.isEmpty\(\) && !file\)/.test(approvals) &&
   /if \(signing && !signs && !file\)/.test(approvals), true);
+check('but an invoice is approved, not signed',
+  /function mustSign[\s\S]{0,80}kindOf\(sub\) === 'claim'/.test(approvals), true);
 check('and the project manager is one of them',
   /key: 'pending_manager',[\s\S]{0,120}filed: 'reviewed'/.test(approvals), true);
 check('while the HOD signs nothing',

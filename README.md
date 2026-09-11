@@ -588,9 +588,9 @@ end. Both can do it either way: drawn in the app where the document has a box fo
 on paper and the scan uploaded back. The HOD is the exception &mdash; they approve, and sign
 nothing themselves.
 
-Only the time sheet has a box. An invoice carries one signature, the consultant's, and there is
-nowhere on it for an approver to draw &mdash; so for an invoice the uploaded scan is not an
-alternative but the only thing there is, and the app asks for it before letting the invoice move.
+Only the time sheet is signed. An invoice carries one signature, the consultant's own, and
+nobody in the queue adds to it &mdash; the project manager and the HOD approve a bill, they do
+not sign it, so an invoice moves on with a decision and nothing else to upload.
 
 Every scan is kept, labelled with the signing that produced it. The project manager's is a
 *reviewed copy*; the PA's is the finished article, and only that one lights the **On file**
