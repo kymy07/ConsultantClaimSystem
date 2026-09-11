@@ -370,6 +370,12 @@ check('and the step it was borrowed from gets it back',
   /step\.id !== 'resubmit'\) releaseEditor\(\)/.test(appjs), true);
 check('before the card holding it is rebuilt',
   /renderingResubmit\) return;[\s\S]{0,60}releaseEditor\(\)/.test(resubjs), true);
+/* Once it is open there is nothing to press: the form is on the card, with
+   the reason above it and the way to send it again below it. A button that
+   opens what is already open is a button for its own sake. */
+check('and once open it is there, not behind a button',
+  /if \(!open\) bar\.appendChild\(button\('Open and fix'/.test(resubjs) &&
+  !/Close the editor|Edit the \$\{/.test(resubjs), true);
 
 check('but never over somebody else’s unsaved work',
   /if \(fixingId\(\)\) return false/.test(resubjs) &&

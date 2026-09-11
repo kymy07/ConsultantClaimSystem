@@ -22,7 +22,6 @@ const FIXING_KEY = 'ccs.fixing';        // the submission open in the form, acro
 
 let returned = [];                      // what has come back, for this account
 let resubmitBusy = false;
-let editingId = '';                     // whose document is open in the card
 let putBack = null;                     // returns the borrowed step to its panel
 
 
@@ -46,7 +45,6 @@ function releaseEditor () {
     try { putBack(); } catch (err) { console.warn(err); }
   }
   putBack = null;
-  editingId = '';
 }
 
 /**
@@ -220,6 +218,14 @@ function returnedCard (sub) {
   why.textContent = back.note || 'No reason was given.';
   card.appendChild(why);
 
+  /* The document itself. When this is the one open in the form it is here,
+     now — not behind a button. Somebody whose invoice was sent back has come
+     to this card to fix that invoice, and the invoice is the thing they came
+     for; the reason is above it and the way to send it again is below it. */
+  const editHost = document.createElement('div');
+  editHost.className = 'edithost';
+  editHost.hidden = true;
+
   if (open) {
     const now = document.createElement('p');
     now.className = 'backnow';
@@ -227,6 +233,7 @@ function returnedCard (sub) {
       'wrong with it, then send it back for approval — what goes up is the form as it stands.';
     card.appendChild(now);
   }
+  card.appendChild(editHost);
 
   const note = document.createElement('textarea');
   note.className = 'decidenote';
@@ -234,40 +241,15 @@ function returnedCard (sub) {
   note.placeholder = 'What you changed (optional — the approver sees this)';
   card.appendChild(note);
 
-  /* The document itself, in the card, when somebody asks for it. */
-  const editHost = document.createElement('div');
-  editHost.className = 'edithost';
-  editHost.hidden = true;
-
   const bar = document.createElement('div');
   bar.className = 'btnrow';
   bar.appendChild(button('Read it', 'ghost small', () => reviewSubmission(sub.id)));
 
-  const edit = button(
-    open ? `Edit the ${kindLabel(kind).toLowerCase()}` : 'Open and fix',
-    open ? 'small' : 'ghost small',
-    () => {
-      // a card that has been rebuilt underneath this handler is not the card
-      // on screen, and moving the document into it would hide it in a node
-      // nobody can see
-      if (!editHost.isConnected) return;
-      if (!open) { openToFix(sub); return; }
-      if (editingId === sub.id) {
-        releaseEditor();
-        edit.textContent = `Edit the ${kindLabel(kind).toLowerCase()}`;
-        return;
-      }
-      releaseEditor();
-      putBack = borrowDocument(kind, editHost);
-      if (!putBack) { toast('That document could not be opened here.', true); return; }
-      editingId = sub.id;
-      edit.textContent = 'Close the editor';
-      // not every browser — and no test harness — has it
-      if (editHost.scrollIntoView) {
-        editHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    });
-  bar.appendChild(edit);
+  /* Only a document that is not the one open in the form needs asking for:
+     more than one came back, or opening this one would replace work that is
+     not about it. Once it is open there is nothing to press — it is there. */
+  if (!open) bar.appendChild(button('Open and fix', 'ghost small', () => openToFix(sub)));
+
   const send = button('Send it back for approval', 'primary',
                       () => resubmitOne(sub, note.value.trim(), send));
   bar.appendChild(send);
@@ -282,17 +264,10 @@ function returnedCard (sub) {
     }));
   }
   card.appendChild(bar);
-  card.appendChild(editHost);
 
-  /* If this is the document that is open, it is shown here, now — not
-     behind a button. Somebody whose invoice was sent back has come to this
-     card to fix that invoice, and the invoice is the thing they came for. */
   if (open) {
     putBack = borrowDocument(kind, editHost);
-    if (putBack) {
-      editingId = sub.id;
-      edit.textContent = 'Close the editor';
-    }
+    if (!putBack) toast('That document could not be opened here.', true);
   }
   return card;
 }

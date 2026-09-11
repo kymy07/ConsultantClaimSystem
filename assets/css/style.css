@@ -981,9 +981,9 @@ input.locked,select.locked{background:#f3f6f9;color:var(--navy-soft);cursor:not-
 
 /* the document itself, opened inside the card that is about it */
 .edithost{
-  margin-top:14px;padding-top:14px;border-top:1px dashed #e5a79f;
+  margin-top:14px;padding:14px 0;border-top:1px dashed #e5a79f;border-bottom:1px dashed #e5a79f;
 }
 .edithost[hidden]{display:none}
 .edithost .sheetwrap{margin-top:0}
 .edithost .lead{margin-bottom:12px}
-.backcard.fixing .edithost{border-top-color:var(--orange)}
+.backcard.fixing .edithost{border-color:var(--orange)}
