@@ -11,10 +11,13 @@
                Print it, put it in front of him.
      Upload   — the same list, each with a box for the signed scan. Putting
                a scan on a card is not sending it: it can be looked at and
-               swapped until it is right. One Submit at the bottom files
-               every one of them and closes those months. That is the last
-               step of the claim — nobody collects it afterwards, and what
-               it leaves behind lives in History.
+               swapped until it is right. Save at the foot of the page files
+               what is there and leaves the months open, because scans come
+               back a few at a time and each is worth keeping the day it
+               arrives. Submit is offered once nothing on the page is still
+               waiting for a copy, and closes them all together. That is the
+               last step of the claim — nobody collects it afterwards, and
+               what it leaves behind lives in History.
 
    The administrator keeps the full flow and gets these two as well, because
    the admin stands in everywhere.
@@ -142,6 +145,47 @@ function copiesOwed (rows) {
     if (!filed) n++;
   }));
   return n;
+}
+
+/**
+ * What is still missing before the whole page can be closed.
+ *
+ * Not the same question as copiesOwed(): a scan chosen a moment ago and not
+ * yet saved is not on the record, but it is here, and the month it belongs
+ * to is not waiting on anybody. This is what the Submit button is gated on,
+ * so it counts what nobody has produced yet rather than what has not been
+ * sent yet.
+ */
+function copiesMissing (rows) {
+  let n = 0;
+  rows.forEach(r => ['claim', 'advice'].forEach(kind => {
+    const t = uploadTarget(r, kind);
+    if (!t) return;
+    if (attached.has(t.key)) return;
+    const filed = typeof archiveFor === 'function'
+      ? archiveFor(r.consultant, r.period_year, Number(r.period_month) - 1, kind) : null;
+    if (!filed) n++;
+  }));
+  return n;
+}
+
+/**
+ * The documents on the page with a copy on the record and a month still open.
+ *
+ * These are what Submit closes beyond whatever is being filed in the same
+ * click: a copy saved last week left its month open on purpose, and this is
+ * where those months are finished.
+ */
+function closableSubs (rows) {
+  const subs = [];
+  rows.forEach(r => ['claim', 'advice'].forEach(kind => {
+    const t = uploadTarget(r, kind);
+    if (!t || t.standIn || t.sub.status !== SIGNING_STATUS) return;
+    const filed = typeof archiveFor === 'function'
+      ? archiveFor(r.consultant, r.period_year, Number(r.period_month) - 1, kind) : null;
+    if (filed) subs.push(t.sub);
+  }));
+  return subs;
 }
 
 function byMonthThenName (a, b) {
@@ -669,7 +713,7 @@ async function renderSignUpload () {
     }
   });
 
-  host.appendChild(submitBar());
+  host.appendChild(submitBar(waiting));
 }
 
 /**
@@ -855,44 +899,73 @@ async function dropSuperseded (before, kept) {
 /* The claim ends here. Nobody collects it afterwards: submitting files the
    signed copy, closes the month, and History is where it lives from then on. */
 
-function submitBar () {
+/**
+ * The bar at the foot of the page: keep what is here, and close what is done.
+ *
+ * They are two different acts and they were one button. Filing a signed copy
+ * is safe the moment it is chosen — it is somebody's scan, and holding it in
+ * this browser until every other person's has arrived is how an afternoon's
+ * work is lost to a reload. Closing a month is not safe to do early: a month
+ * that is closed has been handed on.
+ *
+ * So Save files whatever is here and leaves the months open, and Submit is
+ * offered only when nothing on the page is still waiting for a copy — every
+ * document that can have one has one, chosen or already filed. Until then
+ * there is nothing to decide: save what arrived, and come back.
+ */
+function submitBar (rows) {
   const bar = document.createElement('div');
   bar.className = 'signsubmit';
 
-  const ready = attached.size;
+  const here = attached.size;
+  const missing = copiesMissing(rows);
+  const closing = closableSubs(rows).concat(heldJobs().map(j => j.sub));
+  const ready = !missing && closing.length > 0;
+  /* Documents are what is filed; months are what is closed, and a person's
+     month is two documents. Counting one and saying the other put "closes
+     all 3 of these months" under two people's September. */
+  const months = new Set(closing.map(sub => sub.consultant + ' \u00b7 ' + periodOf(sub))).size;
+  const monthWords = months === 1 ? 'the month' : months + ' months on this page';
 
   const said = document.createElement('p');
   said.className = 'signsaid';
   said.setAttribute('role', 'status');
-  said.textContent = ready
-    ? ready + ' signed cop' + (ready === 1 ? 'y' : 'ies') + ' ready. Submit to file in History and close the month. ' +
-      'Submit before leaving or reloading.'
-    : 'Choose signed copies above, then submit to close those months.';
+  said.textContent = here && missing
+    ? here + ' signed cop' + (here === 1 ? 'y is' : 'ies are') + ' here. Save files ' +
+      (here === 1 ? 'it' : 'them') + ' on the record and leaves the month open; ' +
+      missing + ' document' + (missing === 1 ? ' is' : 's are') + ' still waiting for one. ' +
+      'A scan is only on the record once it is saved.'
+    : here
+      ? 'Everything is in. Save files ' + (here === 1 ? 'this copy' : 'these copies') +
+        ' and leaves the months open; Submit files ' + (here === 1 ? 'it' : 'them') +
+        ' and closes ' + monthWords + '.'
+      : missing
+        ? missing + ' document' + (missing === 1 ? '' : 's') + ' on this page ' +
+          (missing === 1 ? 'has' : 'have') + ' no signed copy yet. Save each one as it ' +
+          'arrives; the months are closed together when the last of them is in.'
+        : closing.length
+          ? 'Every signed copy is on the record. Submit closes ' + monthWords +
+            ' and files ' + (months === 1 ? 'it' : 'them') + ' in History.'
+          : 'Nothing here is waiting to be filed or closed.';
   bar.appendChild(said);
 
   const row = document.createElement('div');
   row.className = 'btnrow';
-  const go = button('Submit and close the month', 'primary', () => submitSigned(go));
+  const keep = button('Save', 'ghost', () => saveSigned(keep));
+  keep.disabled = !here;
+  row.appendChild(keep);
+  /* Green, and only when the whole page can go: the colour is the answer to
+     "is this ready?", which is the only question anybody asks of this button. */
+  const go = button('Submit and close the month', ready ? 'go' : '', () => submitSigned(go, rows));
   go.disabled = !ready;
   row.appendChild(go);
   bar.appendChild(row);
   return bar;
 }
 
-/**
- * Send everything that has been put on a card.
- *
- * The scan is filed first and the month closed second. A scan on record for
- * a month still open is a small oddity; a month closed with the scan lost to
- * a failed upload is a month nobody can produce. Once the month is closed
- * the copy it replaced is taken off the record, so a month keeps one.
- *
- * A scan put on an advice nobody wrote carries the invoice's row under an
- * "advice:" key, and the advice is written from that invoice here, first.
- */
-async function submitSigned (go) {
-  if (signingBusy) return;
-  const jobs = [...attached.entries()]
+/** the scans chosen on this page, against what each will be filed as */
+function heldJobs () {
+  return [...attached.entries()]
     .map(([key, file]) => {
       const standIn = key.indexOf('advice:') === 0;
       const id = standIn ? key.slice('advice:'.length) : key;
@@ -900,11 +973,119 @@ async function submitSigned (go) {
                sub: signingSubs.filter(s => s.id === id)[0] };
     })
     .filter(j => j.sub);
-  if (!jobs.length) { toast('Nothing has been put on a card yet.', true); return; }
+}
 
+/**
+ * Put one signed copy on the record, and hand back the document it is of.
+ *
+ * Nothing is closed here. The copy replaces whatever was filed for that
+ * document before, because a month keeps one, and the month itself is left
+ * exactly as it was.
+ */
+async function fileSignedCopy (job, by) {
+  let sub = job.sub;
+
+  /* The advice this scan is of was never written, because it never had to
+     be: it is the invoice's own figures. It is written now, from that
+     invoice, exactly as the Download step draws it — so the copy being
+     filed is the copy of a document that is on the record. */
+  if (job.standIn) {
+    const drawn = await adviceStateFor(sub, null);
+    const made = await Sync.submit(drawn, 'Payment advice for ' + periodOf(sub), 'advice');
+    if (!made || !made.id) throw new Error('the payment advice could not be written');
+    sub = made;
+  }
+
+  const full = await Sync.submission(sub.id);
+  const state = mergeDefaults((full && full.data) || {});
+  const kind = job.standIn ? 'advice' : kindOf(sub);
+  const payload = await Sync.readFile(job.file);
+  payload.name = kindLabel(kind) + ' (signed) — ' + payload.name;
+  // noted before the new copy goes up, since it is about to replace them
+  const before = copiesOnFile(sub, kind);
+  const kept = await Sync.store(state, [payload],
+    kindLabel(kind) + ' signed by ' + by +
+    (before.length ? ' · replaces the earlier copy' : ''), kind, SIGNING_STATUS);
+  await dropSuperseded(before, kept);
+  attached.delete(job.key);
+  return sub;
+}
+
+/**
+ * Keep what is here.
+ *
+ * The copies go up and the months stay open. This is the button for every
+ * day but the last one: scans come back from the HOD a few at a time, and
+ * each is safe on the record the moment it arrives.
+ */
+async function saveSigned (go) {
+  if (signingBusy) return;
+  const jobs = heldJobs();
+  if (!jobs.length) { toast('Nothing has been chosen yet.', true); return; }
+
+  signingBusy = true;
+  const was = go.textContent;
+  go.disabled = true;
+  let done = 0;
+  const failed = [];
+  const by = (Auth.user() || {}).name || myEmail();
+
+  try {
+    for (let i = 0; i < jobs.length; i++) {
+      go.textContent = 'Saving ' + (i + 1) + ' of ' + jobs.length + '…';
+      try {
+        await fileSignedCopy(jobs[i], by);
+        done++;
+      } catch (err) {
+        failed.push((jobs[i].sub.consultant || jobs[i].sub.id) + ': ' + err.message);
+      }
+    }
+  } finally {
+    signingBusy = false;
+    go.disabled = false;
+    go.textContent = was;
+  }
+
+  archiveLoaded = false;            // everybody else reads the newest copy
+  toast(failed.length
+    ? done + ' saved. ' + failed.length + ' could not be: ' + failed[0]
+    : done + ' signed cop' + (done === 1 ? 'y is' : 'ies are') + ' on the record. ' +
+      (done === 1 ? 'That month stays' : 'Those months stay') + ' open until everything is in.',
+    !!failed.length);
+  await renderSignUpload();
+}
+
+/**
+ * File whatever is left, and close the months.
+ *
+ * The scan is filed first and the month closed second. A scan on record for
+ * a month still open is a small oddity; a month closed with the scan lost to
+ * a failed upload is a month nobody can produce. Once the month is closed
+ * the copy it replaced is taken off the record, so a month keeps one.
+ *
+ * Everything on the page goes together, because the button is only offered
+ * when everything on the page can: the copies saved on earlier days are
+ * closed here alongside the ones filed in this same click.
+ */
+async function submitSigned (go, rows) {
+  if (signingBusy) return;
+  const jobs = heldJobs();
+  const already = closableSubs(rows || uploadRows());
+  const closing = [];
+  const seen = new Set();
+  const remember = sub => {
+    if (!sub || seen.has(sub.id)) return;
+    seen.add(sub.id);
+    closing.push(sub);
+  };
+  already.forEach(remember);
+  if (!jobs.length && !closing.length) { toast('Nothing here is ready to be closed.', true); return; }
+
+  const months = [...new Set(jobs.map(j => j.sub).concat(already)
+    .map(sub => sub.consultant + ' · ' + periodOf(sub)))];
   if (!confirm(
-    'Submit ' + jobs.length + ' signed cop' + (jobs.length === 1 ? 'y' : 'ies') + '?\n\n' +
-    jobs.map(j => j.sub.consultant + ' · ' + periodOf(j.sub)).join('\n') +
+    'Submit ' + months.length + ' month' + (months.length === 1 ? '' : 's') + '?\n\n' +
+    months.join('\n') +
     '\n\nThose months are confirmed. They move to History, and any earlier copy for them is replaced.')) return;
 
   signingBusy = true;
@@ -916,32 +1097,18 @@ async function submitSigned (go) {
 
   try {
     for (let i = 0; i < jobs.length; i++) {
-      let sub = jobs[i].sub;
       go.textContent = 'Sending ' + (i + 1) + ' of ' + jobs.length + '…';
       try {
-        /* The advice this scan is of was never written, because it never had
-           to be: it is the invoice's own figures. It is written now, from
-           that invoice, exactly as the Download step draws it — so the copy
-           being filed is the copy of a document that is on the record. */
-        if (jobs[i].standIn) {
-          const drawn = await adviceStateFor(sub, null);
-          const made = await Sync.submit(drawn, 'Payment advice for ' + periodOf(sub), 'advice');
-          if (!made || !made.id) throw new Error('the payment advice could not be written');
-          sub = made;
-        }
-        const full = await Sync.submission(sub.id);
-        const state = mergeDefaults((full && full.data) || {});
-        const kind = jobs[i].standIn ? 'advice' : kindOf(sub);
-        const payload = await Sync.readFile(jobs[i].file);
-        payload.name = kindLabel(kind) + ' (signed) — ' + payload.name;
-        // noted before the new copy goes up, since it is about to replace them
-        const before = copiesOnFile(sub, kind);
-        const kept = await Sync.store(state, [payload],
-          kindLabel(kind) + ' signed by ' + by +
-          (before.length ? ' · replaces the earlier copy' : ''), kind, SIGNING_STATUS);
+        remember(await fileSignedCopy(jobs[i], by));
+      } catch (err) {
+        failed.push((jobs[i].sub.consultant || jobs[i].sub.id) + ': ' + err.message);
+      }
+    }
+    for (let i = 0; i < closing.length; i++) {
+      go.textContent = 'Closing ' + (i + 1) + ' of ' + closing.length + '…';
+      const sub = closing[i];
+      try {
         if (sub.status === SIGNING_STATUS) await Sync.act(sub.id, 'approve', '');
-        await dropSuperseded(before, kept);
-        attached.delete(jobs[i].key);
         done++;
       } catch (err) {
         failed.push((sub.consultant || sub.id) + ': ' + err.message);
@@ -955,9 +1122,9 @@ async function submitSigned (go) {
 
   archiveLoaded = false;            // everybody else reads the newest copy
   toast(failed.length
-    ? done + ' sent. ' + failed.length + ' could not be: ' + failed[0]
-    : done + ' signed cop' + (done === 1 ? 'y' : 'ies') + ' filed. ' +
-      (done === 1 ? 'That month is' : 'Those months are') + ' closed, and in History now.',
+    ? done + ' closed. ' + failed.length + ' could not be: ' + failed[0]
+    : done + ' document' + (done === 1 ? '' : 's') + ' filed and closed. ' +
+      (done === 1 ? 'That month is' : 'Those months are') + ' in History now.',
     !!failed.length);
   await renderSignUpload();
 }

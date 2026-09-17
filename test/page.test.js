@@ -434,10 +434,10 @@ check('an advice nobody wrote still takes its signed copy',
   /key: 'advice:' \+ row\.invoice\.id, standIn: true/.test(signingjs) &&
   /r\.invoice = monthInvoice\(r\.consultant/.test(signingjs), true);
 check('and it is written from the invoice as it is filed',
-  /if \(jobs\[i\]\.standIn\) \{[\s\S]{0,320}Sync\.submit\(drawn, 'Payment advice for '/
+  /if \(job\.standIn\) \{[\s\S]{0,320}Sync\.submit\(drawn, 'Payment advice for '/
     .test(signingjs) &&
-  /const kind = jobs\[i\]\.standIn \? 'advice' : kindOf\(sub\)/.test(signingjs) &&
-  /attached\.delete\(jobs\[i\]\.key\)/.test(signingjs), true);
+  /const kind = job\.standIn \? 'advice' : kindOf\(sub\)/.test(signingjs) &&
+  /attached\.delete\(job\.key\)/.test(signingjs), true);
 check('and the line says where it will come from',
   /written from the invoice when you submit/.test(signingjs), true);
 check('and can be read before it goes',
@@ -445,9 +445,29 @@ check('and can be read before it goes',
   /function openFilePreview/.test(previewjs), true);
 check('the copy already on file can be read too',
   /async function viewFiled/.test(signingjs), true);
-check('one Submit at the bottom sends them',
-  /host\.appendChild\(submitBar\(\)\)/.test(signingjs) &&
-  /go\.disabled = !ready/.test(signingjs), true);
+/* Saving is not closing, and they were one button. A scan is safe on the
+   record the moment somebody has it — holding a month's worth in this
+   browser until the last person's arrives is how an afternoon is lost to a
+   reload — but a month that is closed has been handed on. So Save files what
+   is there and leaves the months open. */
+check('Save files what has arrived and leaves the months open',
+  /host\.appendChild\(submitBar\(waiting\)\)/.test(signingjs) &&
+  /button\('Save', 'ghost', \(\) => saveSigned\(keep\)\)/.test(signingjs) &&
+  /async function saveSigned/.test(signingjs) &&
+  /async function fileSignedCopy[\s\S]{0,1400}await Sync\.store\(/.test(signingjs) &&
+  (signingjs.match(/Sync\.act\(/g) || []).length === 1, true);
+/* And Submit is not offered until nothing on the page is still waiting for
+   a copy — chosen or already filed, every document that can have one has
+   one. Green is the answer to "is this ready?" before the words are read. */
+check('and Submit is offered, in green, only when none are missing',
+  /const ready = !missing && closing.length > 0/.test(signingjs) &&
+  /function copiesMissing[\s\S]{0,700}if \(attached\.has\(t\.key\)\) return/.test(signingjs) &&
+  /button\('Submit and close the month', ready \? 'go' : ''/.test(signingjs) &&
+  /go\.disabled = !ready/.test(signingjs) &&
+  /\.btn\.go\{background:var\(--ok\)/.test(css), true);
+check('and it closes the months saved on earlier days with them',
+  /function closableSubs[\s\S]{0,460}if \(filed\) subs\.push\(t\.sub\)/.test(signingjs) &&
+  /const already = closableSubs\(rows \|\| uploadRows\(\)\)/.test(signingjs), true);
 /* The button says the name the office uses; the sentence above it says the
    whole name, for whoever does not know who that is. */
 /* A button that is a drawing must be drawn, not typed. Whichever font the
@@ -811,7 +831,8 @@ check('submitting closes the month rather than passing it on',
   /'Submit and close the month'/.test(signingjs) &&
   !/finance/.test(authjs) && !/pending_finance|'finance'/.test(signingjs), true);
 check('and it files the scan before it closes the month',
-  /await Sync\.store\([\s\S]{0,220}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/.test(signingjs), true);
+  /remember\(await fileSignedCopy\(jobs\[i\], by\)\)[\s\S]{0,420}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/
+    .test(signingjs), true);
 /* The month is closed by the HOD's approval, not by the scan arriving. A
    scan can arrive late, or be replaced by a better one, so a closed document
    still has a box for it; what is gone is the old card that re-offered the

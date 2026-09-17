@@ -159,6 +159,11 @@ label.check input{width:auto}
 .btn.danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
 .btn.primary{background:var(--orange);border-color:var(--orange)}
 .btn.primary:hover{background:#d9541c}
+/* the one button that finishes a month rather than moving it along. It is
+   only given this colour when the whole page can go, so the colour is the
+   answer to "is this ready?" before the words are read. */
+.btn.go{background:var(--ok);border-color:var(--ok)}
+.btn.go:hover{background:#17724b}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 
