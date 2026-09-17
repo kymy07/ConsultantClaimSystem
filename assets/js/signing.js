@@ -465,12 +465,20 @@ function downloadLine (name, month, kind, claim) {
   const doc = kind === 'claim' ? (claim || closedClaim) : null;
   const advice = kind === 'advice' ? adviceFor(where) : null;
   const printable = s => !!s && (s.status === SIGNING_STATUS || s.status === 'complete');
-  const ready = kind === 'claim' ? (printable(doc) ? doc : null) : (printable(advice) ? advice : null);
-  const target = kind === 'claim' ? doc : advice;
+  /* An advice nobody edited is still printable: it is built from the
+     invoice the HOD approved, and that is the whole of it. So the invoice
+     stands in for it here, and the PDF is drawn as an advice. */
+  const paidInvoice = kind === 'advice' && !advice
+    ? monthInvoice(name, month.y, month.m) : null;
+  const ready = kind === 'claim' ? (printable(doc) ? doc : null)
+    : printable(advice) ? advice
+      : (adviceUnlocked(paidInvoice) ? paidInvoice : null);
+  const target = kind === 'claim' ? doc : (advice || paidInvoice);
 
   const words = kind === 'claim'
     ? sheetStatusWords(name, month.y, month.m)
-    : advice ? adviceWords(advice) : 'Not written yet';
+    : advice ? adviceWords(advice)
+      : adviceUnlocked(paidInvoice) ? 'Ready to download' : 'Not written yet';
 
   if (!ready) {
     const closed = target && target.status === 'complete';
@@ -485,27 +493,32 @@ function downloadLine (name, month, kind, claim) {
     labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
                  () => reviewSubmission(ready.id)),
     labelledIcon('download', 'Download', `Download the ${label.toLowerCase()} for ${who}`,
-                 control => downloadForSigning(ready, control))
+                 control => downloadForSigning(ready, control, kind))
   ]), statusBadge(words)];
 }
 
-/** the document as it was approved, as a PDF for the printer */
-async function signingPdf (sub) {
-  const full = await Sync.submission(sub.id);
-  if (!full || !full.data) throw new Error('That document could not be read.');
-  const state = mergeDefaults(full.data);
-  if (kindOf(sub) === 'advice') {
+/**
+ * The document as it was approved, as a PDF for the printer.
+ *
+ * `as` says which document to draw, because one row can stand for another:
+ * an advice nobody edited is drawn from the invoice it pays.
+ */
+async function signingPdf (sub, as) {
+  const kind = as || kindOf(sub);
+  if (kind === 'advice') {
     /* Hers goes on it as it is printed, so the sheet the HOD signs already
        carries the Prepared by signature rather than an empty box. */
-    state.sig = state.sig || {};
-    if (!state.sig.pa && myLastSignature()) state.sig.pa = myLastSignature();
+    const state = await adviceStateFor(sub, kindOf(sub) === 'advice' ? sub : null);
     return { blob: (await buildAdvicePDF(state)).output('blob'),
              name: adviceFileBase(state) + '.pdf' };
   }
+  const full = await Sync.submission(sub.id);
+  if (!full || !full.data) throw new Error('That document could not be read.');
+  const state = mergeDefaults(full.data);
   return { blob: (await buildClaimPDF(state)).output('blob'), name: claimFileBase(state) + '.pdf' };
 }
 
-async function downloadForSigning (sub, btn) {
+async function downloadForSigning (sub, btn, as) {
   if (signingBusy) return;
   signingBusy = true;
   // an icon with its word would lose the icon if its text were swapped out
@@ -515,7 +528,7 @@ async function downloadForSigning (sub, btn) {
   btn.setAttribute('aria-busy', 'true');
   if (!drawn) btn.textContent = 'Preparing…';
   try {
-    const pdf = await signingPdf(sub);
+    const pdf = await signingPdf(sub, as);
     saveAs(pdf.blob, pdf.name);
   } catch (err) {
     toast(err.message || 'Could not download that.', true);
@@ -1175,6 +1188,16 @@ function adviceUnlocked (invoice) {
   return !!invoice && invoice.status === 'complete';
 }
 
+/** the invoice for one person and month, whatever stage it has reached */
+function monthInvoice (name, year, month) {
+  const who = String(name || '').trim();
+  return signingSubs.filter(s =>
+    kindOf(s) === 'invoice' &&
+    String(s.consultant || '').trim() === who &&
+    Number(s.period_year) === Number(year) &&
+    Number(s.period_month) === Number(month))[0] || null;
+}
+
 /** the advice for one person and month, whatever stage it has reached */
 function adviceFor (sub) {
   const who = String(sub.consultant || '').trim();
@@ -1187,9 +1210,9 @@ function adviceFor (sub) {
 
 /** where one advice has got, in the words the page uses */
 function adviceWords (advice) {
-  if (!advice) return 'Not prepared';
-  if (advice.status === 'complete') return 'Signed and closed';
-  if (advice.status === SIGNING_STATUS) return 'Waiting for the signed copy';
+  if (!advice) return 'Ready to download';
+  if (advice.status === 'complete') return 'Signed and filed';
+  if (advice.status === SIGNING_STATUS) return 'Edited \u00b7 ready to download';
   if (advice.status === 'returned') return 'Sent back';
   return (typeof STATUS_TEXT === 'object' && STATUS_TEXT[advice.status]) || advice.status;
 }
@@ -1231,13 +1254,13 @@ async function renderAdvice () {
   const count = document.createElement('p');
   count.className = 'historycount';
   count.setAttribute('role', 'status');
-  const waiting = rows.filter(sub => {
+  const ready = rows.filter(sub => {
     const a = adviceFor(sub);
-    return a ? a.status === SIGNING_STATUS : adviceUnlocked(sub);
+    return adviceUnlocked(sub) && (!a || a.status === SIGNING_STATUS);
   }).length;
-  count.textContent = waiting
-    ? `${waiting} payment advice${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} action.`
-    : 'No payment advice needs action.';
+  count.textContent = ready
+    ? `${ready} payment advice${ready === 1 ? ' is' : 's are'} ready to download.`
+    : 'Nothing is ready here yet.';
   host.appendChild(count);
 
   /* Everybody with a profile is on the table whether or not their invoice has
@@ -1255,29 +1278,23 @@ async function renderAdvice () {
     const cell = document.createElement('div');
     cell.className = 'signcell';
     cell.appendChild(signingDocument(
-      advice ? 'Payment Advice' : adviceUnlocked(sub) ? 'Not prepared yet' : 'Locked',
-      advice ? (advice.invoice_no || sub.invoice_no || '')
-        : adviceUnlocked(sub) ? 'From invoice ' + (sub.invoice_no || '')
-          : sub.status === 'returned' ? 'Awaiting invoice resubmission'
-            : 'Available after HOD invoice approval',
+      adviceUnlocked(sub) ? 'Payment Advice' : 'Locked',
+      adviceUnlocked(sub) ? 'From invoice ' + (sub.invoice_no || '')
+        : sub.status === 'returned' ? 'Awaiting invoice resubmission'
+          : 'Available after HOD invoice approval',
       actions));
 
+    /* Ready from the moment the HOD approves the invoice, whether or not
+       anybody has opened it: Preview to read it, Edit to correct it. There
+       is nothing to write and nothing to send — the Download step has it
+       either way. */
     const bar = document.createElement('div');
     bar.className = 'btnrow';
-    if (!advice) {
-      if (adviceUnlocked(sub)) {
-        const go = button('Edit', 'primary small', () => openAdviceEditor(sub, go));
-        bar.appendChild(go);
-      }
-    } else if (advice.status === SIGNING_STATUS) {
-      /* The HOD signs this on paper, not here, so the last thing that
-         happens to it happens on the Re-Upload step with the signed time
-         sheet. This row says so rather than offering a button that would
-         do half of it. */
-      const said = document.createElement('p');
-      said.className = 'signhint';
-      said.textContent = 'Next: Download, get the HOD signature, then Re-Upload the signed copy.';
-      bar.appendChild(said);
+    if (adviceUnlocked(sub) && (!advice || advice.status === SIGNING_STATUS)) {
+      const look = button('Preview', 'ghost small', () => previewAdviceFor(sub, advice, look));
+      bar.appendChild(look);
+      const go = button('Edit', 'primary small', () => openAdviceEditor(sub, go));
+      bar.appendChild(go);
     }
     if (bar.children.length) cell.appendChild(bar);
 
@@ -1632,6 +1649,41 @@ let adviceTrigger = null;
  * It opens as a page of its own rather than a panel under the table, because
  * it is a document being worked on and not a row being edited.
  */
+/**
+ * The payment advice's form, built from the invoice it pays.
+ *
+ * Everything on it that matters is the invoice's: the vendor, the number,
+ * the amount, the month. What this adds is the dates, the two names, and
+ * the PA's own signature — none of which the invoice knows and none of
+ * which anybody should have to type. A saved advice keeps whatever was
+ * typed into it; an unsaved one is this and nothing else, which is why it
+ * can be downloaded without ever having been opened.
+ */
+async function adviceStateFor (invoiceSub, adviceSub) {
+  const from = adviceSub || invoiceSub;
+  const full = await Sync.submission(from.id);
+  if (!full || !full.data) throw new Error('That document could not be read.');
+  const state = mergeDefaults(full.data);
+
+  /* The one number on this form that must never be blank. It is the
+     invoice's own, and the row knows it even if the stored form does not. */
+  if (!state.invoice.no) state.invoice.no = from.invoice_no || invoiceSub.invoice_no || '';
+
+  const today = new Date().toISOString().slice(0, 10);
+  state.advice = Object.assign({
+    receivedDate: today,
+    preparedDate: today,
+    preparedName: (Auth.personFor('pa') || ''),
+    approvedName: (Auth.personFor('boss') || '')
+  }, state.advice || {});
+
+  /* Hers, from the Signature step. The form carries it rather than asking
+     for it again, which is the whole reason it is put there first. */
+  state.sig = state.sig || {};
+  if (myLastSignature()) state.sig.pa = myLastSignature();
+  return state;
+}
+
 async function openAdviceEditor (sub, trigger) {
   const box = document.getElementById('adviceEditor');
   const host = document.getElementById('adviceEditorForm');
@@ -1649,32 +1701,17 @@ async function openAdviceEditor (sub, trigger) {
   host.appendChild(loading);
   showAdviceEditor(box);
 
+  /* Whatever was saved for this month, or the invoice it would be built
+     from. Either way the form opens filled in. */
+  const saved = adviceFor(sub);
   let state;
   try {
-    const full = await Sync.submission(sub.id);
-    if (!full || !full.data) throw new Error('That invoice could not be read.');
-    state = mergeDefaults(full.data);
+    state = await adviceStateFor(sub, saved);
   } catch (err) {
     loading.textContent = err.message || 'That invoice could not be read.';
     return;
   }
-
-  /* The one number on this form that must never be blank. It is the
-     invoice's own, and the row knows it even if the stored form does not. */
-  if (!state.invoice.no && sub.invoice_no) state.invoice.no = sub.invoice_no;
-
-  const today = new Date().toISOString().slice(0, 10);
-  state.advice = Object.assign({
-    receivedDate: today,
-    preparedDate: today,
-    preparedName: (Auth.personFor('pa') || ''),
-    approvedName: (Auth.personFor('boss') || '')
-  }, state.advice || {});
-  /* Hers, from the Signature step. The form carries it rather than asking
-     for it again, which is the whole reason it is put there first. */
-  state.sig = state.sig || {};
-  if (myLastSignature()) state.sig.pa = myLastSignature();
-  adviceOpen = { sub: sub, state: state };
+  adviceOpen = { sub: sub, advice: saved, state: state };
 
   host.innerHTML = '';
   const warn = adviceSignatureWarning();
@@ -1705,6 +1742,34 @@ function closeAdviceEditor (restoreFocus) {
   document.body.style.overflow = adviceScroll;
   if (restoreFocus !== false && adviceTrigger && adviceTrigger.isConnected) adviceTrigger.focus();
   adviceTrigger = null;
+}
+
+/** the advice for one month, drawn from whatever it is built from, in a tab */
+async function previewAdviceFor (sub, advice, control) {
+  if (signingBusy) return;
+  const tab = window.open('', '_blank');
+  signingBusy = true;
+  if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
+  try {
+    const state = await adviceStateFor(sub, advice);
+    const doc = await buildAdvicePDF(state);
+    const blob = doc.output('blob');
+    if (tab && !tab.closed) {
+      const url = URL.createObjectURL(blob);
+      tab.location = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      openFilePreview('Payment Advice \u00b7 ' + (sub.consultant || ''),
+                      adviceFileBase(state) + '.pdf', blob, control);
+      toast('Your browser blocked the new tab, so it opened here instead.');
+    }
+  } catch (err) {
+    if (tab && !tab.closed) tab.close();
+    toast(err.message || 'Could not draw it.', true);
+  } finally {
+    signingBusy = false;
+    if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
+  }
 }
 
 /**
@@ -1750,32 +1815,38 @@ async function previewAdvice (control) {
 }
 
 /**
- * Send one round.
+ * Keep what was typed.
  *
- * Everything it says comes from the invoice it pays and from the boxes just
- * filled in, so nothing is gathered again here. It travels the road the time
- * sheet travels: the project manager, the HOD, then back here to be signed.
+ * There is nothing to send: the approval this form needed was the
+ * invoice's, and the HOD signs the printed copy rather than anything here.
+ * So saving is saving — the first time it puts the advice on the record at
+ * the stage that waits for the signed copy, and after that it replaces the
+ * form on the one already there rather than making a second.
+ *
+ * Nothing has to be saved at all. An advice nobody opened is downloaded
+ * from the invoice just the same; this is for when something on it needs
+ * to be different.
  */
 async function prepareAdvice (go) {
   if (signingBusy || !adviceOpen) return;
   const sub = adviceOpen.sub;
   const state = adviceOpen.state;
-  const who = `${sub.consultant || 'somebody'} \u00b7 ${periodOf(sub)}`;
-  if (!confirm(`Write the payment advice for ${who}?\n\n` +
-               'It is ready to print at once: the HOD signs it on paper, and the signed copy ' +
-               'comes back on the Re-Upload step. Nobody approves it in here again.')) return;
 
   signingBusy = true;
   const was = go.textContent;
   go.disabled = true;
-  go.textContent = 'Sending\u2026';
+  go.textContent = 'Saving\u2026';
   try {
-    await Sync.submit(state, 'Payment advice for ' + periodOf(sub), 'advice');
+    if (adviceOpen.advice) {
+      await Sync.updateData(adviceOpen.advice.id, state);
+    } else {
+      await Sync.submit(state, 'Payment advice for ' + periodOf(sub), 'advice');
+    }
     closeAdviceEditor();
-    toast('Payment advice written. Print it from the Download step.');
+    toast('Payment advice saved. It is ready on the Download step.');
     await renderAdvice();
   } catch (err) {
-    toast(err.message || 'Could not send it.', true);
+    toast(err.message || 'Could not save it.', true);
     go.disabled = false;
     go.textContent = was;
   } finally {
@@ -1807,12 +1878,16 @@ function monthSubmission (rec, kind) {
     Number(s.period_month) === Number(rec.period_month))[0] || null;
 }
 
-/** one submission's form, drawn as the document it is */
-async function monthDocument (sub) {
-  const full = await Sync.submission(sub.id);
-  if (!full || !full.data) throw new Error('That document could not be read.');
-  const state = mergeDefaults(full.data);
-  const kind = kindOf(sub);
+/**
+ * One submission's form, drawn as the document it is — or as `as` says,
+ * since an invoice stands in for an advice nobody edited.
+ */
+async function monthDocument (sub, as) {
+  const kind = as || kindOf(sub);
+  const state = kind === 'advice'
+    ? await adviceStateFor(sub, kindOf(sub) === 'advice' ? sub : null)
+    : mergeDefaults(((await Sync.submission(sub.id)) || {}).data || null);
+  if (!state) throw new Error('That document could not be read.');
   const doc = kind === 'invoice' ? await buildInvoicePDF(state)
     : kind === 'advice' ? await buildAdvicePDF(state)
     : await buildClaimPDF(state);
@@ -1861,10 +1936,16 @@ async function gatherMonth (rec) {
       const filed = await filedCopy(rec, kind);
       if (filed) { files.push(filed); continue; }
     } catch (err) { /* fall through to drawing it */ }
-    const sub = monthSubmission(rec, kind);
+    /* An advice nobody edited is drawn from the invoice it pays, the way
+       the Download step draws it, so a month is whole either way. */
+    let sub = monthSubmission(rec, kind);
+    if (!sub && kind === 'advice') {
+      const paid = monthSubmission(rec, 'invoice');
+      if (adviceUnlocked(paid)) sub = paid;
+    }
     if (!sub) { missing.push(pair[1]); continue; }
     try {
-      files.push(await monthDocument(sub));
+      files.push(await monthDocument(sub, kind));
     } catch (err) {
       missing.push(pair[1]);
     }

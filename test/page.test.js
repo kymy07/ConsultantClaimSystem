@@ -605,11 +605,22 @@ check('the payment advice is a table of everybody, like the other two',
    disputed bill. */
 check('an invoice is paid only once the HOD has approved it',
   /function adviceUnlocked[\s\S]{0,420}invoice\.status === 'complete'/.test(signingjs) &&
-  !/It goes to the project manager, then the HOD, then back here/.test(signingjs) &&
-  /id="adviceEditorSend">Write it</.test(html), true);
-check('an invoice sent back locks the row again',
-  /function adviceUnlocked[\s\S]{0,420}invoice\.status === 'complete'/.test(signingjs) &&
-  /if \(adviceUnlocked\(sub\)\) \{[\s\S]{0,40}button\('Edit'/.test(signingjs), true);
+  !/It goes to the project manager, then the HOD, then back here/.test(signingjs), true);
+/* And from that moment it is ready, whether or not anybody opened it: the
+   form is the invoice's own figures, so there is nothing to write. The row
+   offers Preview and Edit; the Download step draws it from the invoice when
+   nothing was saved, and saving replaces the form rather than making a
+   second advice. */
+check('the advice is ready without being written',
+  /if \(adviceUnlocked\(sub\) && \(!advice \|\| advice\.status === SIGNING_STATUS\)\)/.test(signingjs) &&
+  /button\('Preview'[\s\S]{0,120}button\('Edit'/.test(signingjs) &&
+  /id="adviceEditorSend">Save</.test(html), true);
+check('and drawn from the invoice wherever it is asked for',
+  /async function adviceStateFor/.test(signingjs) &&
+  /const paidInvoice = kind === 'advice' && !advice/.test(signingjs) &&
+  /if \(!sub && kind === 'advice'\)/.test(signingjs) &&
+  /await Sync\.updateData\(adviceOpen\.advice\.id, state\)/.test(signingjs) &&
+  /updateData: updateSubmissionData/.test(syncjs), true);
 check('and every sent invoice is on the table, saying where it has got',
   /function invoicesSubmitted[\s\S]{0,200}kindOf\(s\) === 'invoice'/.test(signingjs) &&
   !/function invoicesApproved/.test(signingjs), true);

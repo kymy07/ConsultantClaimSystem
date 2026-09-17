@@ -602,6 +602,30 @@ async function unstoreSigned (id) {
 }
 
 /**
+ * Replace the form on a payment advice that is still open. The server
+ * refuses anything else: another kind of document, a closed month, or an
+ * account that is not the PA or the administrator.
+ */
+async function updateSubmissionData (id, data) {
+  return ccsFetch('/submissions/' + encodeURIComponent(id) + '/data', {
+    method: 'PATCH',
+    body: JSON.stringify({ data: data })
+  });
+}
+
+/**
+ * Replace the form on a payment advice that is still open. The server
+ * refuses anything else: another kind of document, a closed month, or an
+ * account that is not the PA or the administrator.
+ */
+async function updateSubmissionData (id, data) {
+  return ccsFetch('/submissions/' + encodeURIComponent(id) + '/data', {
+    method: 'PATCH',
+    body: JSON.stringify({ data: data })
+  });
+}
+
+/**
  * Take a stray spelling off the record: every document filed under a name
  * that has no profile, when a profile exists a letter or two away. The
  * server decides whether the name qualifies and refuses otherwise, so
@@ -634,6 +658,8 @@ const Sync = {
   storedOne: storedClaim,
   unstore: unstoreSigned,
   removeStrayName: removeStrayName,
+  updateData: updateSubmissionData,
+  updateData: updateSubmissionData,
   forget: forgetSync,
   get on () { return syncOn; },
   /* The probe answers after the first paint. Until it has, a screen that
