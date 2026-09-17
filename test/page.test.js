@@ -603,10 +603,14 @@ check('the payment advice is a table of everybody, like the other two',
 /* An invoice sent back is going to change, and its figures are the only
    figures the advice has, so that row locks again rather than paying a
    disputed bill. */
+check('an invoice is paid only once the HOD has approved it',
+  /function adviceUnlocked[\s\S]{0,420}invoice\.status === 'complete'/.test(signingjs) &&
+  !/It goes to the project manager, then the HOD, then back here/.test(signingjs) &&
+  /id="adviceEditorSend">Write it</.test(html), true);
 check('an invoice sent back locks the row again',
-  /function adviceUnlocked[\s\S]{0,120}invoice\.status !== 'returned'/.test(signingjs) &&
+  /function adviceUnlocked[\s\S]{0,420}invoice\.status === 'complete'/.test(signingjs) &&
   /if \(adviceUnlocked\(sub\)\) \{[\s\S]{0,40}button\('Edit'/.test(signingjs), true);
-check('and it unlocks on the invoice being sent, not on it being approved',
+check('and every sent invoice is on the table, saying where it has got',
   /function invoicesSubmitted[\s\S]{0,200}kindOf\(s\) === 'invoice'/.test(signingjs) &&
   !/function invoicesApproved/.test(signingjs), true);
 /* Nothing on the form may be retyped: it is the invoice's own figures or it

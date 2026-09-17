@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#223140">
 <meta name="description" content="Prepare your monthly claim and invoice, follow approvals, and collect signed documents with Geospatial AI.">
 <title>Consultant Claim System</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20260917v">
+<link rel="stylesheet" href="assets/css/style.css?v=20260917w">
 </head>
 <body class="locked">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -512,10 +512,11 @@
 <section class="panel" id="p-advice" data-step="advice">
   <h2>Payment Advice</h2>
   <p class="lead">Uzma&rsquo;s own form for paying a consultant&rsquo;s invoice. Everybody is listed
-    below; a row unlocks once that person has sent their invoice for the month. Open it, fill in the
-    office&rsquo;s own boxes, check it, and send it round the way a time sheet goes &mdash; the
-    project manager, then the HOD. It comes back approved: print it, have the HOD sign it, and file
-    the signed copy on the <b>Re-Upload</b> step. The consultant never sees this form.</p>
+    below; a row unlocks once the HOD has approved that person&rsquo;s invoice for the month. Open it, fill in the
+    office&rsquo;s own boxes, check it, and write it. Nobody approves it in here: the project
+    manager and the HOD have already approved the invoice it pays. Print it from <b>Download</b>,
+    have the HOD sign it, and file the signed copy on <b>Re-Upload</b>. The consultant never sees
+    this form.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshAdvice">Refresh</button>
   </div>
@@ -582,7 +583,7 @@
     </div>
     <div class="editdlg-actions">
       <button class="btn ghost small" id="adviceEditorPreview">Preview in new tab</button>
-      <button class="btn small" id="adviceEditorSend">Send for approval</button>
+      <button class="btn small" id="adviceEditorSend">Write it</button>
       <button class="btn ghost small" id="adviceEditorClose">Close</button>
     </div>
   </div>
@@ -596,29 +597,29 @@
      fetches the page again but keeps the old JavaScript for up to ten minutes
      — which reads as "the fix did not work". Bump this stamp whenever
      anything under assets/ changes and a reload picks it all up at once. -->
-<script src="vendor/jspdf.umd.min.js?v=20260917v"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js?v=20260917v"></script>
-<script src="vendor/carlito.js?v=20260917v"></script>
-<script src="vendor/exceljs.min.js?v=20260917v"></script>
-<script src="vendor/FileSaver.min.js?v=20260917v"></script>
-<script src="vendor/signature_pad.umd.min.js?v=20260917v"></script>
-<script src="vendor/docx.umd.js?v=20260917v"></script>
-<script src="assets/js/state.js?v=20260917v"></script>
-<script src="assets/js/holidays.js?v=20260917v"></script>
-<script src="assets/js/logo.js?v=20260917v"></script>
-<script src="assets/js/timesheet.js?v=20260917v"></script>
-<script src="assets/js/signature.js?v=20260917v"></script>
-<script src="assets/js/gen-invoice.js?v=20260917v"></script>
-<script src="assets/js/gen-claim.js?v=20260917v"></script>
-<script src="assets/js/gen-advice.js?v=20260917v"></script>
-<script src="assets/js/preview.js?v=20260917v"></script>
-<script src="assets/js/auth.js?v=20260917v"></script>
-<script src="assets/js/sync.js?v=20260917v"></script>
-<script src="assets/js/zip.js?v=20260917v"></script>
-<script src="assets/js/approvals.js?v=20260917v"></script>
-<script src="assets/js/archive.js?v=20260917v"></script>
-<script src="assets/js/resubmit.js?v=20260917v"></script>
-<script src="assets/js/signing.js?v=20260917v"></script>
-<script src="assets/js/app.js?v=20260917v"></script>
+<script src="vendor/jspdf.umd.min.js?v=20260917w"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js?v=20260917w"></script>
+<script src="vendor/carlito.js?v=20260917w"></script>
+<script src="vendor/exceljs.min.js?v=20260917w"></script>
+<script src="vendor/FileSaver.min.js?v=20260917w"></script>
+<script src="vendor/signature_pad.umd.min.js?v=20260917w"></script>
+<script src="vendor/docx.umd.js?v=20260917w"></script>
+<script src="assets/js/state.js?v=20260917w"></script>
+<script src="assets/js/holidays.js?v=20260917w"></script>
+<script src="assets/js/logo.js?v=20260917w"></script>
+<script src="assets/js/timesheet.js?v=20260917w"></script>
+<script src="assets/js/signature.js?v=20260917w"></script>
+<script src="assets/js/gen-invoice.js?v=20260917w"></script>
+<script src="assets/js/gen-claim.js?v=20260917w"></script>
+<script src="assets/js/gen-advice.js?v=20260917w"></script>
+<script src="assets/js/preview.js?v=20260917w"></script>
+<script src="assets/js/auth.js?v=20260917w"></script>
+<script src="assets/js/sync.js?v=20260917w"></script>
+<script src="assets/js/zip.js?v=20260917w"></script>
+<script src="assets/js/approvals.js?v=20260917w"></script>
+<script src="assets/js/archive.js?v=20260917w"></script>
+<script src="assets/js/resubmit.js?v=20260917w"></script>
+<script src="assets/js/signing.js?v=20260917w"></script>
+<script src="assets/js/app.js?v=20260917w"></script>
 </body>
 </html>

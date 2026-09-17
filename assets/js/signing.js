@@ -1174,7 +1174,11 @@ function invoicesSubmitted () {
  * disputed, so the row waits for it to come round again.
  */
 function adviceUnlocked (invoice) {
-  return !!invoice && invoice.status !== 'returned';
+  /* Only once the HOD has approved the invoice. The advice pays that bill,
+     and its figures are the bill's; writing it against an invoice still
+     being argued about would be writing it against a number that may
+     change. An invoice finishes at the HOD, so approved means complete. */
+  return !!invoice && invoice.status === 'complete';
 }
 
 /** the advice for one person and month, whatever stage it has reached */
@@ -1217,7 +1221,7 @@ function adviceStatusWords (invoice, advice) {
 function adviceLockedCell () {
   const cell = document.createElement('div');
   cell.className = 'signcell';
-  cell.appendChild(signingDocument('Locked', 'Unlocks when the invoice is submitted', []));
+  cell.appendChild(signingDocument('Locked', 'Unlocks once the HOD has approved the invoice', []));
   return cell;
 }
 
@@ -1260,7 +1264,8 @@ async function renderAdvice () {
       advice ? 'Payment Advice' : adviceUnlocked(sub) ? 'Not prepared yet' : 'Locked',
       advice ? (advice.invoice_no || sub.invoice_no || '')
         : adviceUnlocked(sub) ? 'From invoice ' + (sub.invoice_no || '')
-          : 'Unlocks when the invoice comes round again',
+          : sub.status === 'returned' ? 'Unlocks when the invoice comes round again'
+            : 'Unlocks once the HOD has approved the invoice',
       actions));
 
     const bar = document.createElement('div');
@@ -1277,7 +1282,7 @@ async function renderAdvice () {
          do half of it. */
       const said = document.createElement('p');
       said.className = 'signhint';
-      said.textContent = 'Approved. Print it, have the HOD sign it, and file the signed copy ' +
+      said.textContent = 'Written. Print it from the Download step, have the HOD sign it, and file the signed copy ' +
         'on the Re-Upload step.';
       bar.appendChild(said);
     }
@@ -1763,8 +1768,9 @@ async function prepareAdvice (go) {
   const sub = adviceOpen.sub;
   const state = adviceOpen.state;
   const who = `${sub.consultant || 'somebody'} \u00b7 ${periodOf(sub)}`;
-  if (!confirm(`Send the payment advice for ${who} for approval?\n\n` +
-               'It goes to the project manager, then the HOD, then back here to be signed.')) return;
+  if (!confirm(`Write the payment advice for ${who}?\n\n` +
+               'It is ready to print at once: the HOD signs it on paper, and the signed copy ' +
+               'comes back on the Re-Upload step. Nobody approves it in here again.')) return;
 
   signingBusy = true;
   const was = go.textContent;
@@ -1773,7 +1779,7 @@ async function prepareAdvice (go) {
   try {
     await Sync.submit(state, 'Payment advice for ' + periodOf(sub), 'advice');
     closeAdviceEditor();
-    toast('Payment advice sent to the project manager.');
+    toast('Payment advice written. Print it from the Download step.');
     await renderAdvice();
   } catch (err) {
     toast(err.message || 'Could not send it.', true);
