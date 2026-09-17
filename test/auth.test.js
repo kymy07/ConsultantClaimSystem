@@ -116,7 +116,7 @@ const run = expr => vm.runInContext(expr, ctx);
   check('case and spaces ignored',     run("isAllowed('  Hanis.Rashidan@UzmaGroup.com ')"), true);
   check('any other BDOS user refused', run("isAllowed('someone.else@uzmagroup.com')"), false);
   check('empty refused',               run("isAllowed('')"), false);
-  check('ten accounts, no more',      run('ALLOWED_USERS.length'), 10);
+  check('eleven accounts, no more',   run('ALLOWED_USERS.length'), 11);
   /* The claim finishes with the PA. Nobody collects it afterwards, so the
      account that used to has no part in the process and no way into it. */
   check('the collector is off the list',
@@ -129,6 +129,7 @@ const run = expr => vm.runInContext(expr, ctx);
   check('so does Afifah',              run("ROLES['afifah.zamzari@uzmagroup.com']"), 'consultant');
   check('and so does Nizar',           run("ROLES['nizar.tarmizi@uzmagroup.com']"), 'consultant');
   check('and so does Tajul',           run("ROLES['tajul.sharby@uzmagroup.com']"), 'consultant');
+  check('and so does Anir',            run("ROLES['anir.sharbirin@uzmagroup.com']"), 'consultant');
   check('a consultant does not see everybody', run("seesEveryone('consultant')"), false);
   check('but the administrator does',  run("seesEveryone('admin')"), true);
   check('and so do the approvers, who have to read what they sign',
