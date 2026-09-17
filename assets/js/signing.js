@@ -63,7 +63,8 @@ function uploadRows () {
         period_month: item.period_month,
         invoice_no: item.invoice_no || '',
         claim: null,
-        advice: null
+        advice: null,
+        invoice: null
       });
     }
     const row = rows.get(id);
@@ -92,7 +93,7 @@ function uploadRows () {
       const id = `${who}|${y}|${m}`;
       if (!rows.has(id)) {
         rows.set(id, { consultant: who, period_year: y, period_month: m, invoice_no: '',
-                       claim: null, advice: null });
+                       claim: null, advice: null, invoice: null });
       }
       const row = rows.get(id);
       ['claim', 'advice'].forEach(kind => {
@@ -101,14 +102,41 @@ function uploadRows () {
       });
     });
   });
-  return [...rows.values()].sort(byMonthThenName);
+  /* The advice for a month may never have been written — it does not have
+     to be, because it is the invoice's own figures and Download draws it
+     from there. The invoice is carried here so that the signed copy of an
+     advice nobody edited still has something to be filed against. */
+  const all = [...rows.values()];
+  all.forEach(r => {
+    if (r.advice) return;
+    r.invoice = monthInvoice(r.consultant, Number(r.period_year), Number(r.period_month));
+    if (r.invoice && !r.invoice_no) r.invoice_no = r.invoice.invoice_no || '';
+  });
+  return all.sort(byMonthThenName);
+}
+
+/**
+ * What a signed copy for one document of a month is filed against.
+ *
+ * Usually the submission itself. For a payment advice nobody wrote, the
+ * approved invoice stands in for it — the same stand-in the Download step
+ * prints from — and the advice is written from it when the scan is sent.
+ * The key is what the held scan is kept under, which is why a stand-in has
+ * one of its own: it is the invoice's row, but it is not the invoice.
+ */
+function uploadTarget (row, kind) {
+  if (row[kind]) return { sub: row[kind], key: row[kind].id, standIn: false };
+  if (kind === 'advice' && adviceUnlocked(row.invoice)) {
+    return { sub: row.invoice, key: 'advice:' + row.invoice.id, standIn: true };
+  }
+  return null;
 }
 
 /** the documents on the page whose signed copy is not on the record yet */
 function copiesOwed (rows) {
   let n = 0;
   rows.forEach(r => ['claim', 'advice'].forEach(kind => {
-    if (!r[kind]) return;
+    if (!uploadTarget(r, kind)) return;
     const filed = typeof archiveFor === 'function'
       ? archiveFor(r.consultant, r.period_year, Number(r.period_month) - 1, kind) : null;
     if (!filed) n++;
@@ -606,10 +634,10 @@ async function renderSignUpload () {
   /* A scan is held in this browser until Submit sends it, so one put on a
      card that is no longer in the list has nowhere to go. */
   const live = new Set();
-  waiting.forEach(r => {
-    if (r.claim) live.add(r.claim.id);
-    if (r.advice) live.add(r.advice.id);
-  });
+  waiting.forEach(r => ['claim', 'advice'].forEach(kind => {
+    const t = uploadTarget(r, kind);
+    if (t) live.add(t.key);
+  }));
   [...attached.keys()].forEach(id => { if (!live.has(id)) attached.delete(id); });
 
   const count = copiesOwed(waiting);
@@ -655,14 +683,18 @@ function uploadLine (row, kind) {
   const label = kind === 'advice' ? 'Payment Advice' : 'Time sheet';
   const filed = typeof archiveFor === 'function'
     ? archiveFor(row.consultant, row.period_year, Number(row.period_month) - 1, kind) : null;
-  const target = row[kind];
-  const held = target && attached.get(target.id);
+  const target = uploadTarget(row, kind);
+  const held = target && attached.get(target.key);
 
   /* A closed document with no scan on the record says so on its own line,
-     because "Closed" beside an empty box otherwise reads as finished. */
-  const meta = target && target.status === 'complete' && !filed && !held
-    ? [row.invoice_no, 'closed — signed copy not on the record yet'].filter(Boolean).join(' · ')
-    : (row.invoice_no || '');
+     because "Closed" beside an empty box otherwise reads as finished. An
+     advice standing in on its invoice says where it will come from, so the
+     box is not one to wonder about before there is a document. */
+  const meta = target && target.standIn
+    ? [row.invoice_no, 'written from the invoice when you submit'].filter(Boolean).join(' · ')
+    : target && target.sub.status === 'complete' && !filed && !held
+      ? [row.invoice_no, 'closed — signed copy not on the record yet'].filter(Boolean).join(' · ')
+      : (row.invoice_no || '');
   const doc = signingDocument(label, meta, []);
   if (!target && !filed) doc.classList.add('signdoc-quiet');
 
@@ -695,6 +727,7 @@ function uploadWaitingWords (row, kind) {
  * worse than neither.
  */
 function uploadSlot (row, kind, filed, target, file) {
+  const key = target && target.key;
   const who = `${row.consultant || 'consultant'}, ${periodOf(row)}`;
   const what = kind === 'advice' ? 'payment advice' : 'time sheet';
 
@@ -718,7 +751,7 @@ function uploadSlot (row, kind, filed, target, file) {
         labelledIcon('view', 'View', `View the signed ${what} chosen for ${who}`,
                      () => openFilePreview(`${row.consultant || ''} \u2014 ${periodOf(row)}`,
                                            file.name, file)),
-        button('Remove', 'ghost small', () => { attached.delete(target.id); renderSignUpload(); })
+        button('Remove', 'ghost small', () => { attached.delete(key); renderSignUpload(); })
       ]);
     ready.classList.add('signready-doc');
     cell.appendChild(ready);
@@ -738,7 +771,7 @@ function uploadSlot (row, kind, filed, target, file) {
         inp.value = '';
         return;
       }
-      attached.set(target.id, picked);
+      attached.set(key, picked);
       renderSignUpload();
     });
     pick.appendChild(inp);
@@ -853,11 +886,19 @@ function submitBar () {
  * a month still open is a small oddity; a month closed with the scan lost to
  * a failed upload is a month nobody can produce. Once the month is closed
  * the copy it replaced is taken off the record, so a month keeps one.
+ *
+ * A scan put on an advice nobody wrote carries the invoice's row under an
+ * "advice:" key, and the advice is written from that invoice here, first.
  */
 async function submitSigned (go) {
   if (signingBusy) return;
   const jobs = [...attached.entries()]
-    .map(([id, file]) => ({ sub: signingSubs.filter(s => s.id === id)[0], file }))
+    .map(([key, file]) => {
+      const standIn = key.indexOf('advice:') === 0;
+      const id = standIn ? key.slice('advice:'.length) : key;
+      return { key: key, standIn: standIn, file: file,
+               sub: signingSubs.filter(s => s.id === id)[0] };
+    })
     .filter(j => j.sub);
   if (!jobs.length) { toast('Nothing has been put on a card yet.', true); return; }
 
@@ -875,12 +916,22 @@ async function submitSigned (go) {
 
   try {
     for (let i = 0; i < jobs.length; i++) {
-      const sub = jobs[i].sub;
+      let sub = jobs[i].sub;
       go.textContent = 'Sending ' + (i + 1) + ' of ' + jobs.length + '…';
       try {
+        /* The advice this scan is of was never written, because it never had
+           to be: it is the invoice's own figures. It is written now, from
+           that invoice, exactly as the Download step draws it — so the copy
+           being filed is the copy of a document that is on the record. */
+        if (jobs[i].standIn) {
+          const drawn = await adviceStateFor(sub, null);
+          const made = await Sync.submit(drawn, 'Payment advice for ' + periodOf(sub), 'advice');
+          if (!made || !made.id) throw new Error('the payment advice could not be written');
+          sub = made;
+        }
         const full = await Sync.submission(sub.id);
         const state = mergeDefaults((full && full.data) || {});
-        const kind = kindOf(sub);
+        const kind = jobs[i].standIn ? 'advice' : kindOf(sub);
         const payload = await Sync.readFile(jobs[i].file);
         payload.name = kindLabel(kind) + ' (signed) — ' + payload.name;
         // noted before the new copy goes up, since it is about to replace them
@@ -890,7 +941,7 @@ async function submitSigned (go) {
           (before.length ? ' · replaces the earlier copy' : ''), kind, SIGNING_STATUS);
         if (sub.status === SIGNING_STATUS) await Sync.act(sub.id, 'approve', '');
         await dropSuperseded(before, kept);
-        attached.delete(sub.id);
+        attached.delete(jobs[i].key);
         done++;
       } catch (err) {
         failed.push((sub.consultant || sub.id) + ': ' + err.message);

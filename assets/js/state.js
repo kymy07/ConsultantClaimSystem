@@ -84,6 +84,16 @@ function defaultState () {
       dateAuto: { prep: true, review: true, appr: true }
     },
     sig: { personnel: '', pm: '', hod: '', verified: '' },
+    /* The office's own boxes on the payment advice: the department code, the
+       document lines, the charge-back figures, the names and dates on it.
+       It is empty here because an advice nobody edited has nothing of its
+       own — every box on it comes from the invoice it pays, and the form
+       fills itself in from there.
+       It has to be a key of this object even so. A saved form is read back
+       through mergeDefaults(), which carries over the keys it knows about
+       and drops the rest: without this line everything typed on an advice
+       was stored, and then thrown away the moment it was read again. */
+    advice: {},
     /* Leave already counted this year, one entry per month that has been
        sent for approval: { '2026-09': { pto: 1, mc: 0, ul: 0 } }. It is
        written when a claim goes off, so the balance carries forward on its

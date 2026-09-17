@@ -419,6 +419,22 @@ vm.runInContext(`
   adv('__adv.advice.vendor = "";');
   check('a box typed empty stays empty',          adv('adviceFields(__adv).vendor === ""'), true);
 
+  /* Saving it has to keep it. Every screen that reads a saved advice puts it
+     through mergeDefaults() first, and that carries over the keys
+     defaultState() has and drops the rest — so until the state had a key for
+     the advice, everything typed on the form was stored and then thrown away
+     on the way back in. Save looked like it worked and changed nothing. */
+  adv(`
+    globalThis.__sent = JSON.parse(JSON.stringify(__adv));
+    globalThis.__back = mergeDefaults(JSON.parse(JSON.stringify(__sent)));
+  `);
+  check('a saved advice survives being read back', adv('__back.advice.dept'), 'D099');
+  check('with the document lines it was given',    adv('__back.advice.rows[1].no'), 'INV-2');
+  check('and the figures on them',                 adv('adviceFields(__back).amount'), 1250.5);
+  check('and the figure put on a charge-back line', adv('adviceFields(__back).gl.D030'), 99);
+  check('a form that never had one still has the key',
+        adv('JSON.stringify(mergeDefaults({}).advice)'), '{}');
+
   adv('globalThis.__advDoc = buildAdvicePDF(__adv);');
   try {
     const doc = await ctx.__advDoc;

@@ -420,7 +420,26 @@ check('Download lists what is waiting for the HOD’s signature',
    them to whoever collects the paper. */
 check('a scan put on a card is held, not sent',
   /const attached = new Map\(\)/.test(signingjs) &&
-  /attached\.set\(target\.id, picked\)/.test(signingjs), true);
+  /attached\.set\(key, picked\)/.test(signingjs) &&
+  /const key = target && target\.key/.test(signingjs), true);
+/* And a payment advice takes one whether or not it was ever written. It did
+   not have to be — it is the invoice's own figures, and Download prints it
+   from there — so the approved invoice stands in for it on this page too,
+   and the advice is written from that invoice when the scan is submitted.
+   Without this a signed advice had nowhere to go until somebody opened the
+   editor and saved a form they had nothing to change on. */
+check('an advice nobody wrote still takes its signed copy',
+  /function uploadTarget[\s\S]{0,400}kind === 'advice' && adviceUnlocked\(row\.invoice\)/
+    .test(signingjs) &&
+  /key: 'advice:' \+ row\.invoice\.id, standIn: true/.test(signingjs) &&
+  /r\.invoice = monthInvoice\(r\.consultant/.test(signingjs), true);
+check('and it is written from the invoice as it is filed',
+  /if \(jobs\[i\]\.standIn\) \{[\s\S]{0,320}Sync\.submit\(drawn, 'Payment advice for '/
+    .test(signingjs) &&
+  /const kind = jobs\[i\]\.standIn \? 'advice' : kindOf\(sub\)/.test(signingjs) &&
+  /attached\.delete\(jobs\[i\]\.key\)/.test(signingjs), true);
+check('and the line says where it will come from',
+  /written from the invoice when you submit/.test(signingjs), true);
 check('and can be read before it goes',
   /openFilePreview\(`\$\{row\.consultant/.test(signingjs) &&
   /function openFilePreview/.test(previewjs), true);
