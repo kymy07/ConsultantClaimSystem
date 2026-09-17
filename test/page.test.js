@@ -578,6 +578,12 @@ check('each person is one name and two document lines',
 /* Her own signature, before anything else: it goes in the Prepared by box
    of every advice she writes, and a form prepared before it exists prints
    that box with a name and no signature. */
+/* And it is shown on the form where it will print, not only promised: the
+   box she is looking at is the box the HOD will be handed. */
+check('her signature is drawn in the Prepared by box',
+  /\['Prepared by :', F\.preparedName, F\.preparedDate, '', ink\.pa\]/.test(signingjs) &&
+  /mark\.className = 'adv-sig'/.test(signingjs) &&
+  /\.doc-advice \.adv-sig\{/.test(css), true);
 check("the PA puts her own signature on first",
   /\{ id: 'mysign'/.test(appjs) && /id="p-mysign"/.test(html) &&
   /function renderMySignature[\s\S]{0,240}mountSignaturePicker/.test(signingjs) &&
@@ -668,6 +674,17 @@ check('only the office boxes are typed into',
 check('nothing on it is guessed',
   !/adviceFromProfile/.test(signingjs) &&
   !/a\.staff = /.test(signingjs) && !/a\.manager = /.test(signingjs), true);
+/* Checked beside the boxes that fill it: the sheet on one screen and the
+   form on the other, which a dialog over the form cannot be. The tab is
+   opened on the click, because a browser only allows one while it can still
+   see the click that asked. */
+check('the preview opens in a tab of its own',
+  /const tab = window\.open\('', '_blank'\)/.test(signingjs) &&
+  /tab\.location = url/.test(signingjs) &&
+  /Preview in new tab/.test(html), true);
+check('and falls back to the viewer if the tab was blocked',
+  /if \(tab && !tab\.closed\) \{[\s\S]{0,320}\} else \{[\s\S]{0,120}openFilePreview/
+    .test(signingjs), true);
 check('the dialog can be closed, and hides when it is',
   /function closeAdviceEditor/.test(signingjs) &&
   /\.editdlg\[hidden\]\{display:none\}/.test(css), true);

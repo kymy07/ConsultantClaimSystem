@@ -684,6 +684,8 @@ body.locked > .sitefoot{display:none}
 }
 .doc-advice .adv-signcol b{font-size:10.5px}
 .doc-advice .adv-signcol i{font-size:8.5px}
+.doc-advice .adv-sig{max-width:100%;max-height:42px;object-fit:contain;
+  object-position:left bottom;margin-top:6px}
 .doc-advice .adv-rule{border-top:1px dashed #8a8a8a;margin-top:auto}
 .doc-advice .adv-signline{display:flex;align-items:baseline;gap:6px;font-size:9.5px}
 .doc-advice .adv-signline .adv-box{min-height:0;padding:0;font-size:9.5px}

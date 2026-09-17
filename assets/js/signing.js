@@ -1492,10 +1492,11 @@ function adviceFormDoc (state, changed) {
   doc.appendChild(advBand('Payment Advice Approval'));
   const sign = document.createElement('div');
   sign.className = 'adv-sign';
+  const ink = state.sig || {};
   [
-    ['Prepared by :', F.preparedName, F.preparedDate, ''],
-    ['Reviewed by :', '', '', '(if required)'],
-    ['Approved by :', F.approvedName, F.approvedDate, '']
+    ['Prepared by :', F.preparedName, F.preparedDate, '', ink.pa],
+    ['Reviewed by :', '', '', '(if required)', ''],
+    ['Approved by :', F.approvedName, F.approvedDate, '', ink.hod]
   ].forEach(col => {
     const cell = document.createElement('div');
     cell.className = 'adv-signcol';
@@ -1506,6 +1507,16 @@ function adviceFormDoc (state, changed) {
       const small = document.createElement('i');
       small.textContent = col[3];
       cell.appendChild(small);
+    }
+    /* Her signature, shown where it will print. It is put on the Signature
+       step and carried here, so the box she is looking at is the box the
+       HOD will be handed rather than a promise that it will be filled. */
+    if (col[4]) {
+      const mark = document.createElement('img');
+      mark.className = 'adv-sig';
+      mark.src = col[4];
+      mark.alt = col[1] ? col[1] + '’s signature' : 'Signature';
+      cell.appendChild(mark);
     }
     const rule = document.createElement('span');
     rule.className = 'adv-rule';
@@ -1627,16 +1638,41 @@ function closeAdviceEditor (restoreFocus) {
   adviceTrigger = null;
 }
 
-/** the form as it stands, opened the way any other document is opened */
+/**
+ * The form as it stands, in a tab of its own.
+ *
+ * A tab rather than the in-app viewer, because this one is read beside the
+ * boxes that fill it: somebody checking a payment advice wants the sheet on
+ * one screen and the form on the other, and a dialog over the form they are
+ * checking against is the one place it cannot be.
+ *
+ * The tab is opened on the click and pointed at the document afterwards. A
+ * browser only allows a new tab while it can still see the click that asked
+ * for one, and drawing the PDF takes long enough to lose it. If the tab was
+ * blocked anyway, the viewer is still there to fall back on.
+ */
 async function previewAdvice (control) {
   if (signingBusy || !adviceOpen) return;
+  const tab = window.open('', '_blank');
   signingBusy = true;
   if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
   try {
     const doc = await buildAdvicePDF(adviceOpen.state);
-    openFilePreview('Payment Advice · ' + (adviceOpen.sub.consultant || ''),
-                    adviceFileBase(adviceOpen.state) + '.pdf', doc.output('blob'), control);
+    const name = adviceFileBase(adviceOpen.state) + '.pdf';
+    const blob = doc.output('blob');
+    if (tab && !tab.closed) {
+      /* Revoked on a timer rather than at once: the tab has to have loaded
+         it first, and there is no event here that says it has. */
+      const url = URL.createObjectURL(blob);
+      tab.location = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      openFilePreview('Payment Advice · ' + (adviceOpen.sub.consultant || ''),
+                      name, blob, control);
+      toast('Your browser blocked the new tab, so it opened here instead.');
+    }
   } catch (err) {
+    if (tab && !tab.closed) tab.close();
     toast(err.message || 'Could not draw it.', true);
   } finally {
     signingBusy = false;
