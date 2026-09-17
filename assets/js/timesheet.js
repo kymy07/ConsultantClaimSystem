@@ -8,7 +8,7 @@
    and only '/' is counted into [A] — the rest say why a day is not claimed.
    PTO, MC and UL come out of a yearly allowance (see leaveAllowance); PH does
    not, because a public holiday is the calendar's doing. */
-const CYCLE = ['', '/', 'PH', 'PTO', 'MC', 'UL'];
+const CYCLE = ['', '/', 'PH', 'PTO', 'MC', 'UL', '-'];   // '-' last: a day that is nobody's
 const MARKS = { PH: 'ph', PTO: 'pto', MC: 'mc', UL: 'ul' };      // tick -> cell style
 const MARK_NAMES = Object.assign({ PH: 'Public Holiday' }, LEAVE_NAMES);
 
@@ -265,11 +265,15 @@ function paintDay (td, ts, act, d) {
   const manual = act.days[d] || '';
   const shown = dayValue(ts, act, d);
   td.className = 'c-day dcell';
+  const weekend = isWeekend(ts.year, ts.month, d);
   if (manual === '/') td.classList.add('work');
   else if (MARKS[manual]) td.classList.add(MARKS[manual]);
-  else if (shown === 'SAT' || shown === 'SUN') td.classList.add('we');
+  else if (weekend) td.classList.add('we');        // a dashed weekend keeps its shade
   const button = td.querySelector('.day-toggle');
-  const what = MARK_NAMES[manual] || (manual === '/' ? 'worked' : shown === 'SAT' ? 'Saturday' : shown === 'SUN' ? 'Sunday' : 'unmarked');
+  const what = MARK_NAMES[manual] ||
+    (manual === '/' ? 'worked'
+      : manual === '-' ? (weekend ? 'not a working day' : 'not claimed')
+        : shown === 'SAT' ? 'Saturday' : shown === 'SUN' ? 'Sunday' : 'unmarked');
   const label = `${d} ${MONTHS[ts.month]} ${ts.year}: ${what}`;
   if (button) {
     button.textContent = manual || shown || '–';

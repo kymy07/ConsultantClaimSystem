@@ -380,8 +380,15 @@ function canMarkLeave (S, mark, alreadyThisMark) {
 /* Which days are paid. A day is claimed when it was worked, and also when it
    was a day off that is paid: the weekend, a public holiday, paid time off or
    medical leave. Two things are not — unpaid leave, and a working day nobody
-   marked at all, which is somebody who was not there and did not say why. */
+   marked at all, which is somebody who was not there and did not say why.
+
+   A dash is not a mark in this sense. It is how the paper sheet writes a
+   day that is nobody's — a weekend, mostly — so for pay it is read as no
+   mark at all: a dashed Saturday is still the paid weekend it was, and a
+   dashed Tuesday is still a day not claimed. What it changes is the word
+   printed in the box, and that it was put there on purpose. */
 const PAID_MARKS = { '/': 1, SAT: 1, SUN: 1, PH: 1, PTO: 1, MC: 1 };
+const DASH = '-';
 
 /**
  * What one day of the month is, taken across the whole sheet: a mark anybody
@@ -390,7 +397,7 @@ const PAID_MARKS = { '/': 1, SAT: 1, SUN: 1, PH: 1, PTO: 1, MC: 1 };
  */
 function dayMarkOf (ts, d) {
   for (const act of ts.activities || []) {
-    if (act.days && act.days[d]) return act.days[d];
+    if (act.days && act.days[d] && act.days[d] !== DASH) return act.days[d];
   }
   const w = dowOf(ts.year, ts.month, d);
   return w === 6 ? 'SAT' : w === 0 ? 'SUN' : '';
@@ -414,11 +421,16 @@ function workedDays (ts) {
   return days.size;
 }
 
+/** has somebody put a dash on this day, on any row? that is a reason given */
+function dashedDay (ts, d) {
+  return (ts.activities || []).some(a => a.days && a.days[d] === DASH);
+}
+
 /** working days nobody marked at all: not worked, and no reason given */
 function unmarkedDays (ts) {
   const out = [];
   for (let d = 1, dim = daysInMonth(ts.year, ts.month); d <= dim; d++) {
-    if (dayMarkOf(ts, d) === '') out.push(d);
+    if (dayMarkOf(ts, d) === '' && !dashedDay(ts, d)) out.push(d);
   }
   return out;
 }

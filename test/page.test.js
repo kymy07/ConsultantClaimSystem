@@ -621,6 +621,15 @@ check('and every sent invoice is on the table, saying where it has got',
    profile — and only the administrator, who sets the other terms, may
    change it. */
 const tsjs = fs.readFileSync(path.join(ROOT, 'assets/js/timesheet.js'), 'utf8');
+/* A dash is how the paper sheet writes a day that is nobody's — a weekend,
+   mostly. It prints, and it says the day was looked at; it does not change
+   what the day is worth: a dashed Saturday is still the paid weekend. */
+check('a day can be dashed, as the paper sheet does',
+  /const CYCLE = \['', '\/', 'PH', 'PTO', 'MC', 'UL', '-'\]/.test(tsjs) &&
+  /not a working day/.test(html), true);
+check('and a dash is no mark for pay, so a dashed weekend stays paid',
+  /act\.days\[d\] !== DASH\) return act\.days\[d\]/.test(statejs) &&
+  /dayMarkOf\(ts, d\) === '' && !dashedDay\(ts, d\)/.test(statejs), true);
 check('the leave allowance is read from the profile, not from a constant',
   /function leaveAllowance/.test(statejs) &&
   /const limit = leaveAllowance\(S, mark\)/.test(statejs) &&
