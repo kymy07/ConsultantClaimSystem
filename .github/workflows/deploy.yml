@@ -1,0 +1,48 @@
+name: Deploy to EC2
+
+# Every push to main ships the static site to the server over SSH. It is a
+# plain static app (no build), so the deploy just rsyncs the files into the
+# directory nginx serves — no container, no restart. Manual runs via
+# "Run workflow".
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-claimconsultant
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Rsync site to the server
+        # --delete keeps the served folder a clean mirror; dev-only paths are
+        # excluded so only the site itself is served.
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='test' \
+            --exclude='docs' \
+            --exclude='.gitattributes' \
+            --exclude='.gitignore' \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
+            ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/claimconsultant/"
+
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "curl -fsSk -o /dev/null -w 'claim -> HTTP %{http_code}\n' -H 'Host: claim.uzmadigitalearth.app' https://127.0.0.1/"
