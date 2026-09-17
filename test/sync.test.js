@@ -205,6 +205,12 @@ const adopting = () => {
   box = adopting();
   r = await run('Sync.init(S, adopt)');
   check('a copy from elsewhere is not republished', r.sent, 0);
+  /* And it does not stay here either. The shared list is the list; a copy
+     of a profile the administrator took off is a ghost in every browser
+     that still held it, and was listing a person who no longer existed. */
+  check('and, no longer on the shared list, it is dropped from here', r.dropped, 1);
+  check('so it is gone', run(`Store.profiles()['Someone Else'] === undefined`), true);
+  check('without being marked as deleted here', run(`Store.isBuried('Someone Else')`), false);
 
   reset({
     'GET /ccs/draft':    { status: 200, body: { draft: null } },

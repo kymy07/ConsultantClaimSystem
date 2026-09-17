@@ -729,6 +729,19 @@ const Store = {
     Store.dropName(BURIED_KEY, name);       // saving it again is meaning it
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); return true; } catch (e) { return false; }
   },
+  /**
+   * Drop a local copy of a profile the shared list no longer has.
+   *
+   * Not a deletion: no note is kept, because this browser did not decide
+   * anything — somebody else took the profile off, and this copy is stale.
+   * A note here would have the next sync take it off the shared list again
+   * if somebody saved it back on purpose.
+   */
+  forgetProfile (name) {
+    const p = Store.profiles();
+    delete p[name];
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ }
+  },
   deleteProfile (name) {
     const p = Store.profiles();
     delete p[name];

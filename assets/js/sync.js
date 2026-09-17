@@ -175,6 +175,12 @@ async function deleteProfile (name) {
  * old copy would see a name the shared list was missing and helpfully send it
  * again. A copy that merely arrived here from somebody else is not this
  * browser's to republish, and a name deleted here on purpose is nobody's.
+ *
+ * And a copy the shared list no longer has is dropped from here. Stopping
+ * the republishing was half the fix: the other browsers still held the old
+ * copy and went on listing a person the administrator had taken off. The
+ * shared list is the list; what is here is a copy of it, plus whatever was
+ * saved here and not yet accepted.
  */
 async function mergeProfiles () {
   const remote = await pullProfiles();
@@ -200,7 +206,14 @@ async function mergeProfiles () {
     local[n] !== undefined && !known.has(n) && !Store.isBuried(n));
   for (const name of waiting) await pushProfile(name, local[name]);
 
-  return { gained: gained, sent: waiting.length, removed: removed };
+  let dropped = 0;
+  Object.keys(local).forEach(name => {
+    if (known.has(name) || waiting.indexOf(name) !== -1) return;
+    Store.forgetProfile(name);
+    dropped++;
+  });
+
+  return { gained: gained, sent: waiting.length, removed: removed, dropped: dropped };
 }
 
 /* -----------------------------------------------------------------------
@@ -475,7 +488,7 @@ async function actOnSubmission (id, action, note, data) {
  * @returns {Promise<object>} { on, adopted, gained, sent, removed }
  */
 async function initSync (S, adopt) {
-  const result = { on: false, adopted: false, gained: 0, sent: 0, removed: 0 };
+  const result = { on: false, adopted: false, gained: 0, sent: 0, removed: 0, dropped: 0 };
   probed = true;
   if (!Auth.token()) return result;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return result;
@@ -534,6 +547,7 @@ async function initSync (S, adopt) {
     result.gained = merged.gained;
     result.sent = merged.sent;
     result.removed = merged.removed;
+    result.dropped = merged.dropped;
   } catch (err) { console.warn(err.message || err); }
 
   return result;
