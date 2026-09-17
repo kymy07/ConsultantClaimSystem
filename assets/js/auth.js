@@ -37,6 +37,7 @@ const ROLES = {
   'zharif.zaidi@uzmagroup.com':      'consultant',
   'afifah.zamzari@uzmagroup.com':    'consultant',
   'nizar.tarmizi@uzmagroup.com':     'consultant',
+  'tajul.sharby@uzmagroup.com':      'consultant',
   'hanis.rashidan@uzmagroup.com':    'manager',
   'fadhli.jamaluddin@uzmagroup.com': 'boss',
   'fatin.zaini@uzmagroup.com':       'pa'
@@ -59,7 +60,8 @@ const PROFILE_HINTS = {
   'nuramilazulfa@gmail.com':      /amila/i,
   'zharif.zaidi@uzmagroup.com':   /zharif/i,
   'afifah.zamzari@uzmagroup.com': /afifah/i,
-  'nizar.tarmizi@uzmagroup.com':  /nizar/i
+  'nizar.tarmizi@uzmagroup.com':  /nizar/i,
+  'tajul.sharby@uzmagroup.com':   /tajul/i
 };
 
 /** What a role is called where somebody has to read it. */
