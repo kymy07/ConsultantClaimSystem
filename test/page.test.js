@@ -630,6 +630,14 @@ check('a day can be dashed, as the paper sheet does',
 check('and a dash is no mark for pay, so a dashed weekend stays paid',
   /act\.days\[d\] !== DASH\) return act\.days\[d\]/.test(statejs) &&
   /dayMarkOf\(ts, d\) === '' && !dashedDay\(ts, d\)/.test(statejs), true);
+/* A date belongs to a signature. The project manager's and the HOD's boxes
+   were dated today from the moment the consultant opened the form, which
+   said those two had signed on a day neither had seen it; each is written
+   now when its own signature is placed. */
+check('a signing date is written when the signature is',
+  /const APP_DATES = \{ 'timesheet\.prepDate': 'prep' \};/.test(appjs) &&
+  /const want = APP_DATES\[path\] \? today : '';/.test(appjs) &&
+  /data\.timesheet\[signs\.date\] = todayDotted\(\);/.test(approvals), true);
 check('the leave allowance is read from the profile, not from a constant',
   /function leaveAllowance/.test(statejs) &&
   /const limit = leaveAllowance\(S, mark\)/.test(statejs) &&

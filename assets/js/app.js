@@ -24,19 +24,30 @@ function todayDotted () {
 
 /* The three dates in section C, and the flag that says whether each is still
    the app's to keep up to date. Typing in one hands it over; emptying it
-   hands it back. */
+   hands it back.
+
+   Only the prepared date is the app's to fill in. The other two belong to
+   people who have not acted yet: a date under the project manager's empty
+   signature box says he reviewed this today, and he did not. Each is
+   written when its signature is placed — the project manager's when he
+   approves, the HOD's when the PA places it — so the sheet says when each
+   person actually signed. Somebody signing on paper still types their own
+   date, and that is theirs from then on. */
 const AUTO_DATES = {
   'timesheet.prepDate':   'prep',
   'timesheet.reviewDate': 'review',
   'timesheet.apprDate':   'appr'
 };
+const APP_DATES = { 'timesheet.prepDate': 'prep' };
 
 /**
- * Move every date nobody has typed over on to today.
+ * Move the prepared date on to today, and leave the signing dates empty
+ * until they are signed.
  *
  * Called whenever the form is opened or the month changes, so a claim that
  * sat half-finished for two days is dated the day it is actually sent —
- * while a date somebody set on purpose is left exactly where they set it.
+ * while a date somebody set on purpose, or a signature already placed, is
+ * left exactly where it is.
  */
 function refreshAutoDates () {
   const today = todayDotted();
@@ -45,9 +56,10 @@ function refreshAutoDates () {
   Object.keys(AUTO_DATES).forEach(path => {
     const key = AUTO_DATES[path];
     const field = path.split('.')[1];
-    if (auto[key] === false) return;
-    if (S.timesheet[field] === today) return;
-    S.timesheet[field] = today;
+    if (auto[key] === false) return;          // typed, or signed for
+    const want = APP_DATES[path] ? today : '';
+    if (S.timesheet[field] === want) return;
+    S.timesheet[field] = want;
     moved = true;
   });
   if (moved) { mirror('timesheet.prepDate'); mirror('timesheet.reviewDate'); mirror('timesheet.apprDate'); }

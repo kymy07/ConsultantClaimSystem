@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#223140">
 <meta name="description" content="Prepare your monthly claim and invoice, follow approvals, and collect signed documents with Geospatial AI.">
 <title>Consultant Claim System</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20260919b">
+<link rel="stylesheet" href="assets/css/style.css?v=20260919c">
 </head>
 <body class="locked">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -392,8 +392,8 @@
         <tr>
           <td class="rl">Date</td>
           <td><input class="dinput ta-c" data-bind="timesheet.prepDate" placeholder="26.8.2026" aria-label="Prepared date"></td>
-          <td><input class="dinput ta-c" data-bind="timesheet.reviewDate" placeholder="26.8.2026" aria-label="Reviewed date"></td>
-          <td><input class="dinput ta-c" data-bind="timesheet.apprDate" placeholder="26.8.2026" aria-label="Approved date"></td>
+          <td><input class="dinput ta-c" data-bind="timesheet.reviewDate" placeholder="&mdash; on the day it is reviewed" aria-label="Reviewed date"></td>
+          <td><input class="dinput ta-c" data-bind="timesheet.apprDate" placeholder="&mdash; on the day it is approved" aria-label="Approved date"></td>
           <td><input class="dinput ta-c" data-bind="timesheet.verifDate" placeholder="leave blank &mdash; Finance fills this in" aria-label="Verified date"></td>
         </tr>
       </tbody>
@@ -644,29 +644,29 @@
      fetches the page again but keeps the old JavaScript for up to ten minutes
      — which reads as "the fix did not work". Bump this stamp whenever
      anything under assets/ changes and a reload picks it all up at once. -->
-<script src="vendor/jspdf.umd.min.js?v=20260919b"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js?v=20260919b"></script>
-<script src="vendor/carlito.js?v=20260919b"></script>
-<script src="vendor/exceljs.min.js?v=20260919b"></script>
-<script src="vendor/FileSaver.min.js?v=20260919b"></script>
-<script src="vendor/signature_pad.umd.min.js?v=20260919b"></script>
-<script src="vendor/docx.umd.js?v=20260919b"></script>
-<script src="assets/js/state.js?v=20260919b"></script>
-<script src="assets/js/holidays.js?v=20260919b"></script>
-<script src="assets/js/logo.js?v=20260919b"></script>
-<script src="assets/js/timesheet.js?v=20260919b"></script>
-<script src="assets/js/signature.js?v=20260919b"></script>
-<script src="assets/js/gen-invoice.js?v=20260919b"></script>
-<script src="assets/js/gen-claim.js?v=20260919b"></script>
-<script src="assets/js/gen-advice.js?v=20260919b"></script>
-<script src="assets/js/preview.js?v=20260919b"></script>
-<script src="assets/js/auth.js?v=20260919b"></script>
-<script src="assets/js/sync.js?v=20260919b"></script>
-<script src="assets/js/zip.js?v=20260919b"></script>
-<script src="assets/js/approvals.js?v=20260919b"></script>
-<script src="assets/js/archive.js?v=20260919b"></script>
-<script src="assets/js/resubmit.js?v=20260919b"></script>
-<script src="assets/js/signing.js?v=20260919b"></script>
-<script src="assets/js/app.js?v=20260919b"></script>
+<script src="vendor/jspdf.umd.min.js?v=20260919c"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js?v=20260919c"></script>
+<script src="vendor/carlito.js?v=20260919c"></script>
+<script src="vendor/exceljs.min.js?v=20260919c"></script>
+<script src="vendor/FileSaver.min.js?v=20260919c"></script>
+<script src="vendor/signature_pad.umd.min.js?v=20260919c"></script>
+<script src="vendor/docx.umd.js?v=20260919c"></script>
+<script src="assets/js/state.js?v=20260919c"></script>
+<script src="assets/js/holidays.js?v=20260919c"></script>
+<script src="assets/js/logo.js?v=20260919c"></script>
+<script src="assets/js/timesheet.js?v=20260919c"></script>
+<script src="assets/js/signature.js?v=20260919c"></script>
+<script src="assets/js/gen-invoice.js?v=20260919c"></script>
+<script src="assets/js/gen-claim.js?v=20260919c"></script>
+<script src="assets/js/gen-advice.js?v=20260919c"></script>
+<script src="assets/js/preview.js?v=20260919c"></script>
+<script src="assets/js/auth.js?v=20260919c"></script>
+<script src="assets/js/sync.js?v=20260919c"></script>
+<script src="assets/js/zip.js?v=20260919c"></script>
+<script src="assets/js/approvals.js?v=20260919c"></script>
+<script src="assets/js/archive.js?v=20260919c"></script>
+<script src="assets/js/resubmit.js?v=20260919c"></script>
+<script src="assets/js/signing.js?v=20260919c"></script>
+<script src="assets/js/app.js?v=20260919c"></script>
 </body>
 </html>
