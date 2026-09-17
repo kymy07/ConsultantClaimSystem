@@ -522,7 +522,10 @@ function statusRow (name, kind, sub, first) {
   });
 
   // On file — the signed paper, uploaded back into the system
-  const filedBy = typeof archiveBy === 'function'
+  /* A copy on file belongs to a claim. With the claim gone there is
+     nothing for it to be the copy of, so the lamp goes back to waiting
+     rather than reporting a month that is no longer there. */
+  const filedBy = sub && typeof archiveBy === 'function'
     ? archiveBy(name, statusMonth.y, statusMonth.m, kind) : '';
   tr.appendChild(lampCell(filedBy ? 'done' : 'todo', 'On file',
     filedBy ? 'uploaded back by ' + filedBy
@@ -1065,7 +1068,25 @@ async function deleteSubmission (sub, after) {
   busy = true;
   try {
     await Sync.remove(sub.id);
-    toast('Deleted.');
+    /* And whatever was filed against it. A signed copy is the copy of a
+       claim; once the claim is gone it is a file nobody can place, and it
+       would still light the On file column for a month that has nothing in
+       it. Only copies this account may remove go — BDOS refuses the rest. */
+    const mine = myEmail();
+    const orphans = (typeof archive !== 'undefined' ? archive : []).filter(r =>
+      String(r.consultant || '').trim() === String(sub.consultant || '').trim() &&
+      Number(r.period_year) === Number(sub.period_year) &&
+      Number(r.period_month) === Number(sub.period_month) &&
+      (!r.kind || r.kind === kindOf(sub)) &&
+      (Auth.isAdmin() || String(r.created_by || '').toLowerCase() === mine));
+    for (const r of orphans) {
+      try {
+        await Sync.unstore(r.id);
+        archive = archive.filter(x => x.id !== r.id);
+      } catch (err) { /* already gone, or not ours to remove */ }
+    }
+    toast(orphans.length ? 'Deleted, with its filed cop' + (orphans.length === 1 ? 'y.' : 'ies.')
+                         : 'Deleted.');
     if (typeof loadReturned === 'function') await loadReturned();
     if (typeof renderResubmit === 'function') await renderResubmit();
     renderStepper();

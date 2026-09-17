@@ -442,9 +442,14 @@ check('and each still carries the word for it',
   /b\.setAttribute\('aria-label', label\)/.test(approvals), true);
 /* Nobody who cannot prepare a claim has a profile to pick or saved data of
    their own to erase, so neither control is drawn for them. */
-check('the profile controls belong to whoever prepares claims',
-  /if \(box\) box\.hidden = !canPrepare/.test(appjs) &&
+/* A consultant has one set of details — the one the office assigned them —
+   so the picker, and the way to start another, are the administrator's. */
+check("the profile picker is the administrator's",
+  /if \(box\) box\.hidden = !Auth\.isAdmin\(\)/.test(appjs) &&
   /if \(reset\) reset\.hidden = !canPrepare/.test(appjs), true);
+check('and so is starting a new set of details',
+  /if \(!Auth\.isAdmin\(\)\) return;[\s\S]{0,260}Add new profile/.test(appjs) &&
+  /if \(Auth\.isAdmin\(\)\) \{[\s\S]{0,200}\+ New profile/.test(appjs), true);
 /* A list of what has arrived answers half the question. Whoever collects
    the paper is chasing what has not, and somebody who has handed in nothing
    is invisible in a table built only from what was handed in. */

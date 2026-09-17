@@ -1680,16 +1680,19 @@ function renderProfileCards () {
     host.appendChild(card);
   });
 
-  const add = document.createElement('button');
-  add.className = 'pcard new';
-  add.type = 'button';
-  add.innerHTML = '<b>+ New profile</b>';
-  const addSub = document.createElement('span');
-  addSub.className = 'pcardsub';
-  addSub.textContent = names.length ? 'Start a fresh set of details' : 'Nothing saved yet — start here';
-  add.appendChild(addSub);
-  add.addEventListener('click', startNewProfile);
-  host.appendChild(add);
+  // the same rule as the menu: a new set of details is the office's to start
+  if (Auth.isAdmin()) {
+    const add = document.createElement('button');
+    add.className = 'pcard new';
+    add.type = 'button';
+    add.innerHTML = '<b>+ New profile</b>';
+    const addSub = document.createElement('span');
+    addSub.className = 'pcardsub';
+    addSub.textContent = names.length ? 'Start a fresh set of details' : 'Nothing saved yet — start here';
+    add.appendChild(addSub);
+    add.addEventListener('click', startNewProfile);
+    host.appendChild(add);
+  }
 
   // the details only appear once there is something to show them for
   if (box) {
@@ -1725,7 +1728,10 @@ function refreshProfileList () {
   const canPrepare = Auth.prepares();
   const box = document.getElementById('profileBox');
   const reset = document.getElementById('btnReset');
-  if (box) box.hidden = !canPrepare;
+  /* The picker is for somebody who holds several sets of details, which is
+     the administrator. A consultant has one, the one the office assigned
+     them, so the menu would be a list of one and a way to make a second. */
+  if (box) box.hidden = !Auth.isAdmin();
   if (reset) reset.hidden = !canPrepare;
   if (!canPrepare) {
     openProfiles(false);
@@ -1783,6 +1789,10 @@ function refreshProfileList () {
     menu.appendChild(row);
   });
 
+  /* Only the administrator starts another set of details. To every screen
+     here a second profile is a second person, and who that person is, is
+     the office's to say. */
+  if (!Auth.isAdmin()) return;
   const add = document.createElement('button');
   add.className = 'padd' + (names.length ? ' sep' : '');
   add.textContent = '+  Add new profile';

@@ -11,7 +11,7 @@ let prepares = false;
 let reads = 0;
 const elements = Object.fromEntries(['profileMenu','profileCurrent','profileBox','btnReset','btnProfiles'].map(id=>[id,{hidden:false,textContent:'Other person',innerHTML:'old',setAttribute(){}}]));
 const context = vm.createContext({
- Auth:{prepares:()=>prepares,owns:()=>false},
+ Auth:{prepares:()=>prepares,owns:()=>false,isAdmin:()=>prepares},
  Store:{profiles:()=>{reads++;return {Other:{}};}},
  document:{getElementById:id=>elements[id]},mergeDefaults:p=>p
 });
