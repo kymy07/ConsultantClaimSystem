@@ -7,7 +7,7 @@ class Element {
   setAttribute(k,v) { this.attrs[k] = v; }
   removeAttribute(k) { delete this.attrs[k]; }
 }
-let saved = 0, viewed = 0, errors = 0;
+let saved = 0, viewed = 0, errors = 0, adminNow = false;
 const ctx = vm.createContext({
   document: { createElement: tag => new Element(tag) },
   MONTHS: ['January'], Blob,
@@ -17,6 +17,8 @@ const ctx = vm.createContext({
     {icon:name, title:label, className:cls, handler}),
   Sync: { storedOne: async () => ({files:[{name:'signed.pdf',type:'application/pdf',content:'YQ=='}]}) },
   dataUrlToBytes: () => new Uint8Array([97]),
+  // only the administrator may take a filed copy off the record
+  Auth: { isAdmin: () => adminNow },
   openFilePreview: () => viewed++, saveAs: () => saved++, toast: () => errors++
 });
 vm.runInContext(fs.readFileSync('assets/js/archive.js','utf8'),ctx);
@@ -38,6 +40,12 @@ assert.equal(missing.children[0].textContent,'Not available');
 // every document that is there says what it is called
 const cell = body.children[0].children[1];
 assert.equal(cell.children[0].children[0].children[0].textContent,'signed.pdf');
+// a signed copy is evidence, so only the administrator is offered its removal
+const icons = node => { const out=[]; (function walk(n){ n.children.forEach(c=>{ if(c.icon) out.push(c.icon); walk(c); }); })(node); return out; };
+assert.ok(!icons(ctx.historyTable([record])).includes('remove'));
+adminNow = true;
+assert.ok(icons(ctx.historyTable([record])).includes('remove'));
+adminNow = false;
 (async()=>{
  const control = new Element('button');
  await ctx.openHistoryFile(record,0,'view',control);

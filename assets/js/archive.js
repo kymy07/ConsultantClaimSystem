@@ -456,6 +456,14 @@ function historyTable (records, roster) {
           control.appendChild(text);
           actions.appendChild(control);
         });
+        if (Auth.isAdmin()) {
+          const gone = iconButton('remove', 'Delete the ' + what + ' from the record',
+            'ghost small history-icon danger', () => deleteStored(r, () => paintHistory()));
+          const word = document.createElement('span');
+          word.textContent = 'Delete';
+          gone.appendChild(word);
+          actions.appendChild(gone);
+        }
         item.appendChild(words);
         item.appendChild(actions);
         cell.appendChild(item);
@@ -697,7 +705,54 @@ function archiveRow (r, namePerson) {
     files.appendChild(none);
   }
   row.appendChild(files);
+
+  /* Only the account that set the thing up, and only here: a copy that was
+     filed by the process is evidence, and evidence is not tidied away. */
+  if (Auth.isAdmin()) {
+    const bar = document.createElement('div');
+    bar.className = 'btnrow';
+    bar.appendChild(button('Delete', 'ghost small danger', () => deleteStored(r, async () => {
+      paintArchive();
+      if (typeof renderApprovals === 'function') await renderApprovals();
+    })));
+    row.appendChild(bar);
+  }
   return row;
+}
+
+/**
+ * Take one filed copy off the record.
+ *
+ * The signed copy is the thing anybody will be asked for a year from now, so
+ * this is the administrator's and nobody else's, and the confirmation names
+ * the person, the month and the document before it goes. BDOS allows it for
+ * the administrator and for whoever filed it, and refuses everybody else.
+ *
+ * It exists for copies that were never part of the process — the ones left
+ * behind while the thing was being set up, which look exactly like real ones.
+ */
+async function deleteStored (r, after) {
+  if (archiveBusy) return;
+  const m = Number(r.period_month) || 0;
+  const when = `${MONTHS[Math.max(0, m - 1)]} ${r.period_year || ''}`.trim();
+  const what = (r.kind && typeof kindLabel === 'function' ? kindLabel(r.kind) : 'signed copy').toLowerCase();
+  if (!confirm(
+    `Delete the ${what} on file for ${when}?\n\n` +
+    `${String(r.consultant || 'somebody').trim()}${r.invoice_no ? ' \u00b7 ' + r.invoice_no : ''}\n\n` +
+    'The file goes from the database for everybody, and the claim it belongs to ' +
+    'stops showing a copy on file. This cannot be undone.')) return;
+
+  archiveBusy = true;
+  try {
+    await Sync.unstore(r.id);
+    archive = archive.filter(x => x.id !== r.id);
+    toast('The filed copy is gone.');
+    if (typeof after === 'function') await after();
+  } catch (err) {
+    toast(err.message || 'Could not delete that copy.', true);
+  } finally {
+    archiveBusy = false;
+  }
 }
 
 /** pull one filed document back down and hand it to the browser to save */

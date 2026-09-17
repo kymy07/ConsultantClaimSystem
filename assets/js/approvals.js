@@ -1108,7 +1108,9 @@ const ICON_PATHS = {
   /* an eye — look at it without taking it away */
   view: 'M1.7 8S4.5 3.2 8 3.2 14.3 8 14.3 8 11.5 12.8 8 12.8 1.7 8 1.7 8Z|M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
   /* an arrow into a tray — take a copy away */
-  download: 'M8 2.6v6.9|M5.2 7.1 8 9.9l2.8-2.8|M2.8 11.4v1.1a1 1 0 0 0 1 1h8.4a1 1 0 0 0 1-1v-1.1'
+  download: 'M8 2.6v6.9|M5.2 7.1 8 9.9l2.8-2.8|M2.8 11.4v1.1a1 1 0 0 0 1 1h8.4a1 1 0 0 0 1-1v-1.1',
+  /* a bin — take it off the record altogether */
+  remove: 'M3.2 4.6h9.6|M6.4 4.6V3.4a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2|M4.4 4.6l.5 7.6a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.5-7.6|M6.9 7v3.6|M9.1 7v3.6'
 };
 
 /**

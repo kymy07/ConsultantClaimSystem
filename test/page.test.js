@@ -574,6 +574,15 @@ check('and the cards they replaced are gone',
   !/archrow signcard|function monthGroups|function uploadCard/.test(signingjs), true);
 check('and an icon with its word keeps its icon while it downloads',
   /if \(!drawn\) btn\.textContent = 'Preparing…'/.test(signingjs), true);
+/* A signed copy is what anybody will be asked for a year from now, so taking
+   one off the record is the administrator's alone — and it exists for the
+   copies that were never part of the process. */
+check('a filed copy can be taken off the record',
+  /async function deleteStored/.test(archivejs) && /Sync\.unstore\(r\.id\)/.test(archivejs), true);
+check('by the administrator and nobody else',
+  (archivejs.match(/if \(Auth\.isAdmin\(\)\)/g) || []).length >= 2, true);
+check('and it names what is going before it goes',
+  /Delete the \$\{what\} on file for \$\{when\}/.test(archivejs), true);
 check('and it is named for the person who gets them',
   /'Submit to ' \+ collectorShort\(\)/.test(signingjs) &&
   /finance: 'Jiha'/.test(authjs), true);
