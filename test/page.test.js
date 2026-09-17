@@ -731,9 +731,11 @@ check('and it names what is going before it goes',
   /Delete the \$\{what\} on file for \$\{when\}/.test(archivejs), true);
 /* The claim ends with the PA. Submitting is the last step: it files the
    signed copy, closes the month, and hands it to nobody. */
+/* Finance is where the e-mail goes, not a role in the app: no account, no
+   approval stage. The month is closed here and mailed afterwards. */
 check('submitting closes the month rather than passing it on',
   /'Submit and close the month'/.test(signingjs) &&
-  !/finance/.test(authjs + signingjs), true);
+  !/finance/.test(authjs) && !/pending_finance|'finance'/.test(signingjs), true);
 check('and it files the scan before it closes the month',
   /await Sync\.store\([\s\S]{0,220}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/.test(signingjs), true);
 check('a confirmed month is not offered for upload again',
@@ -798,6 +800,14 @@ check('the administrator compiles a month into one zip',
   /Compile zip/.test(archivejs) &&
   /downloadMonthZip\(anchor, control\)/.test(archivejs) &&
   /async function filedCopy/.test(signingjs), true);
+/* The month goes to Accounts Payable by e-mail. A browser cannot attach a
+   file to a message it did not send, so the app does the two things it can:
+   the zip to the downloads folder, and the mail client opened on a message
+   already addressed and written — the office's own wording and addresses. */
+check('the administrator sends a month to Finance',
+  /Email Finance/.test(archivejs) && /sendToFinance\(anchor, control\)/.test(archivejs) &&
+  /const FINANCE_MAIL = /.test(signingjs) && /adib\.azman@uzmagroup\.com/.test(signingjs) &&
+  /window\.location\.href = financeMailto\(rec, project\)/.test(signingjs), true);
 check('and it prefers the signed copy over a redrawn one',
   /const filed = await filedCopy\(rec, kind\);[\s\S]{0,80}files\.push\(filed\)/
     .test(signingjs), true);

@@ -1818,3 +1818,80 @@ async function downloadMonthZip (rec, control) {
     if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
   }
 }
+
+/* -------------------------------------------------------------------
+   To Finance
+
+   A finished month goes to Accounts Payable by e-mail, with the zip
+   attached. This app has no mail server and should not have one — it
+   would need somebody's mailbox credentials — so it does the two things
+   a browser can do: put the zip in the downloads folder, and open the
+   mail client on a message already addressed and written. Attaching the
+   zip is the one step left to the person, and the toast says so.
+
+   The addresses and the wording are the office's own, copied from the
+   message Finance already receives, so nothing about it has to be
+   remembered month to month.
+   ------------------------------------------------------------------- */
+
+const FINANCE_MAIL = {
+  to: ['adib.azman@uzmagroup.com'],                         // Muhammad Adib Zharif Mohd Azman
+  cc: ['afizah.ariffin@uzmagroup.com',                      // Afizah Ariffin
+       'fadhli.jamaluddin@uzmagroup.com',                   // Mohammad Fadhli Jamaluddin
+       'aisya.abas@uzmagroup.com'],                         // Aisya Azizah Abas
+  dear: 'Adib',
+  project: 'PSPJN'
+};
+
+/** the month as the message writes it: August 2026 */
+function financeMonth (rec) {
+  const m = Number(rec.period_month) || 0;
+  return `${MONTHS[Math.max(0, m - 1)]} ${rec.period_year || ''}`.trim();
+}
+
+/**
+ * The message, as a mailto: link.
+ *
+ * Bare addresses rather than "Name <address>": mail clients disagree about
+ * the second form inside a link and agree about the first. The body ends
+ * at "Thank you." because the client adds the sender's own signature
+ * block after it, and writing one here would put two on the message.
+ */
+function financeMailto (rec, project) {
+  const who = String(rec.consultant || '').trim().split(/\s+/)[0] || 'the consultant';
+  const proj = project || FINANCE_MAIL.project;
+  const subject = `Payment Advice - ${proj} Consultant`;
+  const body = [
+    `Dear ${FINANCE_MAIL.dear},`,
+    '',
+    `Please find the Payment Advice and related documents for ${financeMonth(rec)} payment ` +
+      `to our Consultant (${who}) for ${proj} project. Kindly refer to the attachment for details.`,
+    '',
+    'Appreciate your assistance on this.',
+    '',
+    'Thank you.'
+  ].join('\r\n');
+  return 'mailto:' + FINANCE_MAIL.to.join(',') +
+    '?cc=' + encodeURIComponent(FINANCE_MAIL.cc.join(',')) +
+    '&subject=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(body);
+}
+
+/** the project the month was for, off the claim itself; the usual one if it does not say */
+async function financeProject (rec) {
+  try {
+    const sub = monthSubmission(rec, 'claim') || monthSubmission(rec, 'invoice');
+    if (!sub) return '';
+    const full = await Sync.submission(sub.id);
+    const name = full && full.data && full.data.project && full.data.project.name;
+    return String(name || '').trim();
+  } catch (err) { return ''; }
+}
+
+/** compile the month, then open the message it goes in */
+async function sendToFinance (rec, control) {
+  await downloadMonthZip(rec, control);
+  const project = await financeProject(rec);
+  window.location.href = financeMailto(rec, project);
+  toast('The zip is in your downloads. Attach it to the message that just opened.');
+}

@@ -497,6 +497,14 @@ function historyTable (records, roster) {
     zipWord.textContent = 'Compile zip';
     zip.appendChild(zipWord);
     whole.appendChild(zip);
+    /* And where the folder goes: compiled the same way, then handed to a
+       message already addressed to Finance. */
+    const mail = iconButton('download', `Compile ${name}, ${month}, and open the e-mail to Finance`,
+      'ghost small history-icon', control => sendToFinance(anchor, control));
+    const mailWord = document.createElement('span');
+    mailWord.textContent = 'Email Finance';
+    mail.appendChild(mailWord);
+    whole.appendChild(mail);
     row.appendChild(whole);
 
     body.appendChild(row);
