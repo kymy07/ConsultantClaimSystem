@@ -6,7 +6,7 @@
 
 /* Values a day cell cycles through when clicked. Only '/' is a day worked
    and only '/' is counted into [A] — the rest say why a day is not claimed.
-   PTO, MC and UL come out of a yearly allowance (see LEAVE_LIMITS); PH does
+   PTO, MC and UL come out of a yearly allowance (see leaveAllowance); PH does
    not, because a public holiday is the calendar's doing. */
 const CYCLE = ['', '/', 'PH', 'PTO', 'MC', 'UL'];
 const MARKS = { PH: 'ph', PTO: 'pto', MC: 'mc', UL: 'ul' };      // tick -> cell style
@@ -400,14 +400,23 @@ function renderLeave (S, hostId) {
     .map(mark => ({ mark: mark, n: carriedLeave(S, mark) }))
     .filter(x => x.n > 0);
 
+  /* The allowance is said rather than assumed, because it is no longer the
+     same for everybody: the administrator sets what each person is on. */
+  const pto = leaveAllowance(S, 'PTO');
+  const mc = leaveAllowance(S, 'MC');
+  const days = n => `${n} day${n === 1 ? '' : 's'}`;
+  const both = pto === mc ? `are ${days(pto)} each a year`
+    : `are ${days(pto)} and ${days(mc)} a year`;
+
   host.innerHTML = `
     <div class="leavehead">
       <b>Leave in ${ts.year}</b>
-      <span><b>PTO</b> and <b>MC</b> are ${LEAVE_LIMITS.PTO} days each a year, are paid,
+      <span><b>PTO</b> and <b>MC</b> ${both}, are paid,
         and count into [A]; a day cannot be marked once its allowance is spent.
         <b>UL</b> has no allowance &mdash; nobody is paid for it, so there is nothing
         to ration &mdash; and it does not count into [A].</span>
     </div>
+    <div class="leaveset" hidden></div>
     <table class="leavetable">
       <thead><tr>
         <th>Leave</th><th>${MONTHS[ts.month]}</th>
@@ -423,8 +432,80 @@ function renderLeave (S, hostId) {
       carried.map(x => `${x.n} ${x.mark}`).join(', ') + '.'
     : `Nothing carried forward — ${ts.year} starts here.`;
 
+  mountLeaveAllowance(S, host);
+
   const tbody = host.querySelector('tbody');
   leaveStandings(S).forEach(L => tbody.appendChild(leaveRow(S, L.mark)));
+}
+
+/**
+ * The two boxes the administrator sets, on the card that shows what they do.
+ *
+ * They are on this card rather than buried with the other administered
+ * fields because this is where the number is read: somebody looking at "3
+ * left" is the person who wants to know it should have been 18. Everybody
+ * else reads the sentence above and sees no boxes at all.
+ */
+function mountLeaveAllowance (S, host) {
+  const bar = host.querySelector('.leaveset');
+  if (!bar || typeof Auth === 'undefined' || !Auth.setsNumbering()) return;
+  bar.hidden = false;
+  bar.innerHTML = '';
+
+  const said = document.createElement('span');
+  said.className = 'leaveset-said';
+  said.textContent = 'Days a year for this person:';
+  bar.appendChild(said);
+
+  [['PTO', 'pto'], ['MC', 'mc']].forEach(pair => {
+    const mark = pair[0];
+    const key = pair[1];
+    const label = document.createElement('label');
+    const tag = document.createElement('span');
+    tag.className = 'lmark ' + MARKS[mark];
+    tag.textContent = mark;
+    label.appendChild(tag);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.max = String(LEAVE_MAX);
+    input.step = '1';
+    input.value = String(leaveAllowance(S, mark));
+    input.setAttribute('aria-label', LEAVE_NAMES[mark] + ', days a year');
+    /* Only on change, not on every keystroke: half-typed "1" of "18" would
+       otherwise cut the allowance to one and repaint the card underneath the
+       cursor. */
+    input.addEventListener('change', () => {
+      const n = Math.floor(Number(input.value));
+      if (!Number.isFinite(n) || n < 0 || n > LEAVE_MAX) {
+        input.value = String(leaveAllowance(S, mark));
+        return;
+      }
+      S.leave = S.leave || {};
+      S.leave.allowance = Object.assign({}, S.leave.allowance);
+      S.leave.allowance[key] = n;
+      leaveAllowanceChanged(S);
+    });
+    label.appendChild(input);
+    bar.appendChild(label);
+  });
+
+  const note = document.createElement('span');
+  note.className = 'leaveset-note';
+  note.textContent = 'Saved with the profile.';
+  bar.appendChild(note);
+}
+
+/**
+ * An allowance changed: everything that counted against it is now counted
+ * against a different number, so both copies of the card are drawn again and
+ * the change is saved the way any other edit to the form is.
+ */
+function leaveAllowanceChanged (S) {
+  if (typeof afterTimesheetChange === 'function') afterTimesheetChange();
+  renderLeave(S);
+  renderLeave(S, 'leaveBoxProfile');
 }
 
 /** one leave row: this month, the year so far, and what is left of it */

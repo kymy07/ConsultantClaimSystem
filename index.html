@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#223140">
 <meta name="description" content="Prepare your monthly claim and invoice, follow approvals, and collect signed documents with Geospatial AI.">
 <title>Consultant Claim System</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20260917g">
+<link rel="stylesheet" href="assets/css/style.css?v=20260917h">
 </head>
 <body class="locked">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -198,6 +198,10 @@
       <div class="doc-col">
         <div class="drow"><span class="dlabel">Consultant:</span><input class="dinput" data-bind="consultant.name" placeholder="your full name" aria-label="Full name"></div>
         <div class="drow"><span class="dlabel">IC No.:</span><input class="dinput" data-bind="consultant.ic" placeholder="e.g. 010203-04-0567" aria-label="IC number"></div>
+        <!-- The position is the person's, not the line item's: it was the same
+             on every row of the table, so it is said once, here, with the rest
+             of who this invoice is from. -->
+        <div class="drow"><span class="dlabel">Position:</span><input class="dinput" data-bind="consultant.position" placeholder="e.g. Full Stack Developer" aria-label="Position"></div>
         <div class="drow"><span class="dlabel">Address:</span><input class="dinput" data-bind="consultant.addr1" placeholder="address line 1" aria-label="Personal address, line 1"></div>
         <div class="drow"><span class="dlabel"></span><input class="dinput" data-bind="consultant.addr2" placeholder="address line 2" aria-label="Personal address, line 2"></div>
       </div>
@@ -228,8 +232,8 @@
     <table class="doc-table" id="itemTable">
       <thead><tr>
         <th style="width:40px">#</th><th>Description</th>
-        <th style="width:20%">Position</th><th style="width:19%">Period</th>
-        <th style="width:16%">Amount (RM)</th><th style="width:34px"></th>
+        <th style="width:26%">Period</th>
+        <th style="width:20%">Amount (RM)</th><th style="width:34px"></th>
       </tr></thead>
       <tbody></tbody>
     </table>
@@ -557,29 +561,29 @@
      fetches the page again but keeps the old JavaScript for up to ten minutes
      — which reads as "the fix did not work". Bump this stamp whenever
      anything under assets/ changes and a reload picks it all up at once. -->
-<script src="vendor/jspdf.umd.min.js?v=20260917g"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js?v=20260917g"></script>
-<script src="vendor/carlito.js?v=20260917g"></script>
-<script src="vendor/exceljs.min.js?v=20260917g"></script>
-<script src="vendor/FileSaver.min.js?v=20260917g"></script>
-<script src="vendor/signature_pad.umd.min.js?v=20260917g"></script>
-<script src="vendor/docx.umd.js?v=20260917g"></script>
-<script src="assets/js/state.js?v=20260917g"></script>
-<script src="assets/js/holidays.js?v=20260917g"></script>
-<script src="assets/js/logo.js?v=20260917g"></script>
-<script src="assets/js/timesheet.js?v=20260917g"></script>
-<script src="assets/js/signature.js?v=20260917g"></script>
-<script src="assets/js/gen-invoice.js?v=20260917g"></script>
-<script src="assets/js/gen-claim.js?v=20260917g"></script>
-<script src="assets/js/gen-advice.js?v=20260917g"></script>
-<script src="assets/js/preview.js?v=20260917g"></script>
-<script src="assets/js/auth.js?v=20260917g"></script>
-<script src="assets/js/sync.js?v=20260917g"></script>
-<script src="assets/js/zip.js?v=20260917g"></script>
-<script src="assets/js/approvals.js?v=20260917g"></script>
-<script src="assets/js/archive.js?v=20260917g"></script>
-<script src="assets/js/resubmit.js?v=20260917g"></script>
-<script src="assets/js/signing.js?v=20260917g"></script>
-<script src="assets/js/app.js?v=20260917g"></script>
+<script src="vendor/jspdf.umd.min.js?v=20260917h"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js?v=20260917h"></script>
+<script src="vendor/carlito.js?v=20260917h"></script>
+<script src="vendor/exceljs.min.js?v=20260917h"></script>
+<script src="vendor/FileSaver.min.js?v=20260917h"></script>
+<script src="vendor/signature_pad.umd.min.js?v=20260917h"></script>
+<script src="vendor/docx.umd.js?v=20260917h"></script>
+<script src="assets/js/state.js?v=20260917h"></script>
+<script src="assets/js/holidays.js?v=20260917h"></script>
+<script src="assets/js/logo.js?v=20260917h"></script>
+<script src="assets/js/timesheet.js?v=20260917h"></script>
+<script src="assets/js/signature.js?v=20260917h"></script>
+<script src="assets/js/gen-invoice.js?v=20260917h"></script>
+<script src="assets/js/gen-claim.js?v=20260917h"></script>
+<script src="assets/js/gen-advice.js?v=20260917h"></script>
+<script src="assets/js/preview.js?v=20260917h"></script>
+<script src="assets/js/auth.js?v=20260917h"></script>
+<script src="assets/js/sync.js?v=20260917h"></script>
+<script src="assets/js/zip.js?v=20260917h"></script>
+<script src="assets/js/approvals.js?v=20260917h"></script>
+<script src="assets/js/archive.js?v=20260917h"></script>
+<script src="assets/js/resubmit.js?v=20260917h"></script>
+<script src="assets/js/signing.js?v=20260917h"></script>
+<script src="assets/js/app.js?v=20260917h"></script>
 </body>
 </html>

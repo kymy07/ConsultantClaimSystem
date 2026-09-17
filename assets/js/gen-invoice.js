@@ -83,6 +83,7 @@ async function buildInvoicePDF (S) {
   const leftEnd = drawRows([
     ['Consultant:', C.name],
     ['IC No.:', C.ic],
+    ['Position:', C.position],
     ['Address:', C.addr1],
     ['', C.addr2]
   ], L, VAL_X, LEFT_W, y);
@@ -111,15 +112,17 @@ async function buildInvoicePDF (S) {
   ], L, VAL_X, R - VAL_X, y) + 3;
 
   /* ---- item table ---- */
+  /* No Position column: it was the same on every line, and it is now said
+     once at the top with the rest of who the invoice is from. */
   const rows = items.map((it, i) => [
-    String(i + 1), it.desc || '', it.position || '', it.period || '',
+    String(i + 1), it.desc || '', it.period || '',
     it.amount === '' || it.amount == null ? '' : money(it.amount)
   ]);
-  while (rows.length < 4) rows.push(['', '', '', '', '']);   // blank rows, as in the template
+  while (rows.length < 4) rows.push(['', '', '', '']);   // blank rows, as in the template
 
   doc.autoTable({
     startY: y,
-    head: [['#', 'Description', 'Position', 'Period', 'Amount (RM)']],
+    head: [['#', 'Description', 'Period', 'Amount (RM)']],
     body: rows,
     theme: 'grid',
     margin: { left: L, right: 210 - R },
@@ -130,10 +133,9 @@ async function buildInvoicePDF (S) {
     alternateRowStyles: { fillColor: ALT },
     columnStyles: {
       0: { cellWidth: 18, halign: 'center' },
-      1: { cellWidth: 58 },
-      2: { cellWidth: 36, halign: 'center' },
-      3: { cellWidth: 34 },
-      4: { cellWidth: 34, halign: 'right' }
+      1: { cellWidth: 84 },
+      2: { cellWidth: 44 },
+      3: { cellWidth: 34, halign: 'right' }
     }
   });
   y = doc.lastAutoTable.finalY + 4;
@@ -258,7 +260,8 @@ async function generateInvoiceXLSX (S) {
   ws.getRow(1).height = 22; ws.getRow(2).height = 22; ws.getRow(3).height = 22;
 
   /* ---- details ---- */
-  const left = [['Consultant:', C.name], ['IC No.:', C.ic], ['Address:', C.addr1], ['', C.addr2]];
+  const left = [['Consultant:', C.name], ['IC No.:', C.ic], ['Position:', C.position],
+                ['Address:', C.addr1], ['', C.addr2]];
   const right = [['Invoice No.:', IV.no], ['Invoice Date:', fmtDMY(IV.date)],
                  ['Period:', fmtPeriod(IV.pStart, IV.pEnd)], ['Due Date:', fmtDMY(IV.due)]];
   left.forEach((r, i) => {
@@ -285,28 +288,28 @@ async function generateInvoiceXLSX (S) {
 
   /* ---- item table ---- */
   const headRow = 16;
-  const heads = ['#', 'Description', 'Position', 'Period', 'Amount (RM)'];
-  ws.mergeCells(`B${headRow}:C${headRow}`);
+  const heads = ['#', 'Description', 'Period', 'Amount (RM)'];
+  ws.mergeCells(`B${headRow}:D${headRow}`);
   ws.mergeCells(`E${headRow}:F${headRow}`);
-  [['A', heads[0]], ['B', heads[1]], ['D', heads[2]], ['E', heads[3]], ['G', heads[4]]]
+  [['A', heads[0]], ['B', heads[1]], ['E', heads[2]], ['G', heads[3]]]
     .forEach(([col, txt]) => put(`${col}${headRow}`, txt, {
       font: { bold: true, size: 9, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB.bar } },
       alignment: { horizontal: 'center', vertical: 'middle' }, border: box
     }));
   ws.getRow(headRow).height = 16;
-  ['C', 'F'].forEach(c => { ws.getCell(`${c}${headRow}`).border = box; });
+  ['C', 'D', 'F'].forEach(c => { ws.getCell(`${c}${headRow}`).border = box; });
 
   const bodyRows = Math.max(4, items.length);
   for (let i = 0; i < bodyRows; i++) {
     const row = headRow + 1 + i;
     const it = items[i];
-    ws.mergeCells(`B${row}:C${row}`);
+    ws.mergeCells(`B${row}:D${row}`);
     ws.mergeCells(`E${row}:F${row}`);
     const shade = i % 2 === 1
       ? { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB.alt } } : undefined;
     const cells = {
-      A: it ? i + 1 : '', B: it ? (it.desc || '') : '', D: it ? (it.position || '') : '',
+      A: it ? i + 1 : '', B: it ? (it.desc || '') : '',
       E: it ? (it.period || '') : '', G: it ? Number(it.amount) || 0 : ''
     };
     ['A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {

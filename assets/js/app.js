@@ -768,17 +768,15 @@ function renderItems () {
     tr.innerHTML = `
       <td class="idx">${i + 1}</td>
       <td><input class="dinput" data-f="desc" placeholder="e.g. Consultancy Service Fee"></td>
-      <td><input class="dinput ta-c" data-f="position" placeholder="e.g. Full Stack Developer"></td>
       <td><input class="dinput" data-f="period" placeholder="e.g. 1 - 31 Aug 2026"></td>
       <td><input class="dinput ta-r" data-f="amount" type="number" step="0.01" placeholder="0.00"></td>
       <td><button type="button" class="rowdel" title="Delete this item" aria-label="Delete invoice item ${i + 1}">&times;</button></td>`;
-    const fieldNames = { desc: 'Description', position: 'Position', period: 'Service period', amount: 'Amount in Malaysian ringgit' };
+    const fieldNames = { desc: 'Description', period: 'Service period', amount: 'Amount in Malaysian ringgit' };
     tr.querySelectorAll('input').forEach(inp => {
       inp.setAttribute('aria-label', 'Item ' + (i + 1) + ': ' + fieldNames[inp.dataset.f]);
       if (inp.dataset.f === 'amount') inp.setAttribute('inputmode', 'decimal');
     });
     tr.querySelector('[data-f="desc"]').value = it.desc || '';
-    tr.querySelector('[data-f="position"]').value = it.position || '';
     tr.querySelector('[data-f="period"]').value = it.period || '';
     const amtEl = tr.querySelector('[data-f="amount"]');
     amtEl.value = it.amount === '' || it.amount == null ? '' : it.amount;
@@ -813,7 +811,7 @@ function renderItems () {
   // keep four rows on screen, exactly like the printed template
   for (let i = S.invoice.items.length; i < 4; i++) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td class="idx"></td><td></td><td></td><td></td><td></td><td></td>';
+    tr.innerHTML = '<td class="idx"></td><td></td><td></td><td></td><td></td>';
     tb.appendChild(tr);
   }
 }

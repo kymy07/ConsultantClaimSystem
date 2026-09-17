@@ -591,6 +591,45 @@ check('and it unlocks on the invoice being sent, not on it being approved',
 /* Nothing on the form may be retyped: it is the invoice's own figures or it
    is nothing, so the panel offers only the boxes the claim knows nothing
    about, and shows the rest as facts. */
+/* The allowance was a constant, so everybody was on twelve days whatever
+   they had actually agreed. It is the person's terms, so it lives with the
+   profile — and only the administrator, who sets the other terms, may
+   change it. */
+const tsjs = fs.readFileSync(path.join(ROOT, 'assets/js/timesheet.js'), 'utf8');
+check('the leave allowance is read from the profile, not from a constant',
+  /function leaveAllowance/.test(statejs) &&
+  /const limit = leaveAllowance\(S, mark\)/.test(statejs) &&
+  !/const limit = LEAVE_LIMITS\[mark\]/.test(statejs), true);
+check('twelve days is still what everybody is on until it is changed',
+  /allowance: \{ pto: LEAVE_LIMITS\.PTO, mc: LEAVE_LIMITS\.MC \}/.test(statejs) &&
+  /\? n : LEAVE_LIMITS\[mark\]/.test(statejs), true);
+check('unpaid leave is never capped, whatever is stored against it',
+  /if \(typeof LEAVE_LIMITS\[mark\] !== 'number'\) return null;/.test(statejs) &&
+  /if \(leaveAllowance\(S, mark\) === null\) return true;/.test(statejs), true);
+check('only the administrator sees the boxes that set it',
+  /function mountLeaveAllowance/.test(tsjs) &&
+  /!Auth\.setsNumbering\(\)\) return;/.test(tsjs), true);
+/* A half-typed "1" of "18" would otherwise cut the allowance to one day and
+   repaint the card under the cursor. */
+check('the allowance is taken on change, not on every keystroke',
+  /input\.addEventListener\('change'/.test(tsjs) &&
+  !/input\.addEventListener\('input'[\s\S]{0,200}allowance/.test(tsjs), true);
+
+/* The position was a column in the item table, identical on every line. It
+   is the person's, so it is said once with the rest of who the invoice is
+   from. */
+const invjs = geninvoice;
+check('the invoice says the position under the IC number',
+  /\['IC No\.:', C\.ic\],\s*\n\s*\['Position:', C\.position\]/.test(invjs) &&
+  /\['IC No\.:', C\.ic\], \['Position:', C\.position\]/.test(invjs), true);
+check('and no longer as a column on every line',
+  !/'#', 'Description', 'Position'/.test(invjs) &&
+  !/it\.position/.test(invjs) &&
+  !/data-f="position"/.test(appjs), true);
+check('the editable invoice moved it too',
+  /dlabel">Position:<[\s\S]{0,120}data-bind="consultant\.position"/.test(html) &&
+  !/<th style="width:20%">Position<\/th>/.test(html), true);
+
 check('the editor offers the office boxes and no others',
   /function openAdviceEditor/.test(signingjs) &&
   /adviceInput\('Payment Term \(days\)'/.test(signingjs) &&

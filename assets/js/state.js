@@ -90,7 +90,12 @@ function defaultState () {
        own — nobody types it in, and nobody needs every earlier sheet to
        hand. Keying it by month is what makes resubmitting a claim that came
        back cost nothing: the same month is written again, not added again. */
-    leave: { year: now.getFullYear(), pto: 0, mc: 0, ul: 0, counted: {} }
+    /* `allowance` is the terms this person is on, not a running total:
+       twelve days each unless the administrator agreed otherwise. It lives
+       with the profile because it belongs to the person, and it travels with
+       the claim so an approver reads the same numbers the consultant did. */
+    leave: { year: now.getFullYear(), pto: 0, mc: 0, ul: 0, counted: {},
+             allowance: { pto: LEAVE_LIMITS.PTO, mc: LEAVE_LIMITS.MC } }
   };
 }
 
@@ -243,6 +248,7 @@ function splitAddressLines (line1, line2) {
    not the consultant's, so nothing counts down for it. */
 const LEAVE_KINDS  = ['PTO', 'MC', 'UL'];
 const LEAVE_LIMITS = { PTO: 12, MC: 12 };                    // UL is uncapped
+const LEAVE_MAX    = 366;                                    // a year of days
 const LEAVE_NAMES  = { PTO: 'Paid time off', MC: 'Medical leave', UL: 'Unpaid leave' };
 const LEAVE_KEYS   = { PTO: 'pto', MC: 'mc', UL: 'ul' };     // mark -> where it is carried
 
@@ -307,6 +313,22 @@ function recordLeaveTaken (S) {
 }
 
 /**
+ * How many days of this a year the person is entitled to.
+ *
+ * Twelve is the standard, and the standard is what everybody is on until an
+ * administrator says otherwise \u2014 so the figure is read from the profile
+ * and falls back to the standard rather than being written into every
+ * profile that never needed changing. Unpaid leave is never capped, whatever
+ * is stored against it: there is nothing to ration when nobody is paying.
+ */
+function leaveAllowance (S, mark) {
+  if (typeof LEAVE_LIMITS[mark] !== 'number') return null;
+  const set = ((S && S.leave && S.leave.allowance) || {})[LEAVE_KEYS[mark]];
+  const n = Math.floor(Number(set));
+  return Number.isFinite(n) && n >= 0 && n <= LEAVE_MAX ? n : LEAVE_LIMITS[mark];
+}
+
+/**
  * Where one kind of leave stands for the year the sheet is in.
  *
  * `limit` and `left` are null for a kind that has no allowance, which is
@@ -320,8 +342,8 @@ function leaveStanding (S, mark) {
   const days = leaveDaysInMonth(ts, mark);
   const carried = carriedLeave(S, mark);
   const taken = carried + days.length;
-  const limit = LEAVE_LIMITS[mark];
-  const capped = typeof limit === 'number';
+  const limit = leaveAllowance(S, mark);
+  const capped = limit !== null;
   return {
     mark: mark, name: LEAVE_NAMES[mark], days: days,
     month: days.length, earlier: carried, taken: taken,
@@ -348,7 +370,7 @@ function leaveLeft (S, mark) {
  */
 function canMarkLeave (S, mark, alreadyThisMark) {
   // PH comes out of nobody's allowance, and neither does unpaid leave
-  if (typeof LEAVE_LIMITS[mark] !== 'number') return true;
+  if (leaveAllowance(S, mark) === null) return true;
   if (alreadyThisMark) return true;
   return leaveStanding(S, mark).left > 0;
 }
