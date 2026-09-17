@@ -5,13 +5,13 @@
 **Invoice Timesheet &amp; Personnel Time Sheet generator · PDF · Excel · Word**
 Fill the form once, tick the calendar, download all four documents.
 
-[![Live](https://img.shields.io/badge/Live-uzma--geospatial--ai.github.io%2FClaimConsultant-F26522?style=for-the-badge&logo=githubpages&logoColor=white)](https://uzma-geospatial-ai.github.io/ClaimConsultant/)
+[![Live](https://img.shields.io/badge/Live-claim.uzmadigitalearth.app-F26522?style=for-the-badge&logoColor=white)](https://claim.uzmadigitalearth.app/)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2F5597?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Uzma-Geospatial-AI/ClaimConsultant/actions)
 [![Build](https://img.shields.io/badge/Build-none%20required-1F3864?style=for-the-badge)]()
 [![Offline](https://img.shields.io/badge/Runs%20offline-after%20sign--in-F26522?style=for-the-badge)]()
 [![Dependencies](https://img.shields.io/badge/npm%20install-not%20needed-2F5597?style=for-the-badge&logo=npm&logoColor=white)]()
 
-### 🔗 **[uzma-geospatial-ai.github.io/ClaimConsultant](https://uzma-geospatial-ai.github.io/ClaimConsultant/)**
+### 🔗 **[claim.uzmadigitalearth.app](https://claim.uzmadigitalearth.app/)**
 
 <img src="assets/img/preview.png" alt="The invoice step — a fillable copy of the invoice itself" width="100%">
 
@@ -293,15 +293,11 @@ ConsultantClaimSystem/
 
 ## Getting Started
 
-The app is live on GitHub Pages — nothing to install:
+The app is live on the Uzma server — nothing to install:
 
-**<https://uzma-geospatial-ai.github.io/ClaimConsultant/>**
+**<https://claim.uzmadigitalearth.app/>**
 
-That is the one to use. A second copy is published from the personal mirror at
-<https://kymy07.github.io/ConsultantClaimSystem/>; it is the same app, but the two have separate
-`localStorage`, so work saved at one address is not visible at the other.
-
-It runs entirely in your browser there too: nothing is uploaded, everything stays in that
+It runs entirely in your browser there: nothing is uploaded, everything stays in that
 browser's `localStorage`. To keep a copy on your own machine instead:
 
 ```bash
@@ -640,9 +636,9 @@ asks about September a year later.
 
 ### One thing to remember when changing anything under `assets/`
 
-GitHub Pages serves this page **and everything it loads** with `Cache-Control: max-age=600`. A
-reload fetches the page again but keeps the old JavaScript for up to ten minutes, which looks
-exactly like a fix that did not work — and costs an afternoon before anybody suspects the cache.
+The server — and the Cloudflare CDN in front of it — can serve this page **and everything it
+loads** from cache, so a reload may keep the old JavaScript for minutes, which looks exactly like
+a fix that did not work — and costs an afternoon before anybody suspects the cache.
 
 So every local file is loaded with a `?v=` stamp:
 
