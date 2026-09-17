@@ -11,11 +11,10 @@
                Print it, put it in front of him.
      Upload   — the same list, each with a box for the signed scan. Putting
                a scan on a card is not sending it: it can be looked at and
-               swapped until it is right. One Submit at the bottom sends
-               every one of them, closes those months and hands them to
-               Group People & Finance. A month already sent can be given a
-               newer copy the same way, and the newest is what everybody
-               reads from then on.
+               swapped until it is right. One Submit at the bottom files
+               every one of them and closes those months. That is the last
+               step of the claim — nobody collects it afterwards, and what
+               it leaves behind lives in History.
 
    The administrator keeps the full flow and gets these two as well, because
    the admin stands in everywhere.
@@ -77,12 +76,11 @@ async function learnSigningKinds () {
 }
 
 /* -------------------------------------------------------------------
-   The same table Group People & Finance reads
+   The same table the record is read in
 
-   Fatin and Jiha look at the same months from either end of one step, so
-   they look at them the same way: a table per month, a row per person, and
-   each document in its own column with its name, its reference and its
-   actions under it.
+   A month is read the same way wherever it is read: a table per month, a
+   row per person, and each document in its own column with its name, its
+   reference and its actions under it.
    ------------------------------------------------------------------- */
 
 /**
@@ -195,7 +193,7 @@ function sheetStatusWords (name, y, m) {
       .localeCompare(String(a.updated_at || a.created_at || '')))[0];
   if (!sub) return 'Not submitted';
   if (sub.status === SIGNING_STATUS) return 'Waiting for signature';
-  if (sub.status === 'complete') return 'Sent to ' + collectorShort();
+  if (sub.status === 'complete') return 'Closed';
   return (typeof STATUS_TEXT === 'object' && STATUS_TEXT[sub.status]) || sub.status;
 }
 
@@ -546,33 +544,28 @@ async function dropSuperseded (before, kept) {
    Submitting
    ------------------------------------------------------------------- */
 
-/* Whoever collects the finished paper. Two names for two jobs: the button
-   says what the office calls her, because a button is read once and pressed;
-   the sentence above it says the whole name, because that is where somebody
-   who does not know who Jiha is finds out. */
-const collectorShort = () => Auth.shortFor('finance') || 'Group People & Finance';
-const collectorFull = () => Auth.personFor('finance') ||
-                            Auth.roleName('finance') || 'Group People & Finance';
+/* The claim ends here. Nobody collects it afterwards: submitting files the
+   signed copy, closes the month, and History is where it lives from then on. */
 
 function submitBar () {
   const bar = document.createElement('div');
   bar.className = 'signsubmit';
 
   const ready = attached.size;
-  const who = collectorFull();
 
   const said = document.createElement('p');
   said.className = 'signsaid';
   said.setAttribute('role', 'status');
   said.textContent = ready
-    ? ready + ' signed cop' + (ready === 1 ? 'y is' : 'ies are') + ' ready to submit to ' + who +
-      '. Submitting files the copies and closes any waiting time sheets. Submit before leaving or reloading this page.'
-    : 'Choose signed copies above, then submit them to ' + who + '.';
+    ? ready + ' signed cop' + (ready === 1 ? 'y is' : 'ies are') + ' ready. Submitting files ' +
+      (ready === 1 ? 'it' : 'them') + ' and closes the month — the last step, after which it ' +
+      'lives in History. Submit before leaving or reloading this page.'
+    : 'Choose signed copies above, then submit to close those months.';
   bar.appendChild(said);
 
   const row = document.createElement('div');
   row.className = 'btnrow';
-  const go = button('Submit to ' + collectorShort(), 'primary', () => submitSigned(go));
+  const go = button('Submit and close the month', 'primary', () => submitSigned(go));
   go.disabled = !ready;
   row.appendChild(go);
   bar.appendChild(row);
@@ -594,10 +587,8 @@ async function submitSigned (go) {
     .filter(j => j.sub);
   if (!jobs.length) { toast('Nothing has been put on a card yet.', true); return; }
 
-  const who = collectorFull();
   if (!confirm(
-    'Submit ' + jobs.length + ' signed cop' + (jobs.length === 1 ? 'y' : 'ies') +
-    ' to ' + who + '?\n\n' +
+    'Submit ' + jobs.length + ' signed cop' + (jobs.length === 1 ? 'y' : 'ies') + '?\n\n' +
     jobs.map(j => j.sub.consultant + ' · ' + periodOf(j.sub)).join('\n') +
     '\n\nThose months are confirmed. They move to History, and any earlier copy for them is replaced.')) return;
 
@@ -639,8 +630,8 @@ async function submitSigned (go) {
   archiveLoaded = false;            // everybody else reads the newest copy
   toast(failed.length
     ? done + ' sent. ' + failed.length + ' could not be: ' + failed[0]
-    : done + ' signed cop' + (done === 1 ? 'y' : 'ies') + ' sent to ' + who +
-      '. ' + (done === 1 ? 'That month is' : 'Those months are') + ' in History now.',
+    : done + ' signed cop' + (done === 1 ? 'y' : 'ies') + ' filed. ' +
+      (done === 1 ? 'That month is' : 'Those months are') + ' closed, and in History now.',
     !!failed.length);
   await renderSignUpload();
 }

@@ -235,10 +235,11 @@ check('the step is marked for whoever keeps the records',
   /id: 'history',[^}]*records: true/.test(appjs), true);
 check('and nothing else can reach it',
   /!s\.records \|\| Auth\.keepsRecords\(\)/.test(appjs), true);
-// Reading the whole record back, and taking a copy of it away, is a job —
-// the administrator's and Finance's. Neither of them approves anything.
+// Reading the whole record back, and taking a copy of it away, is a job. The
+// claim finishes with the PA and nobody collects it afterwards, so what it
+// leaves behind is the administrator's to keep.
 check('keeping records is a capability, not a name',
-  /const keepsRecords = r => r === 'admin' \|\| r === 'finance'/.test(authjs), true);
+  /const keepsRecords = r => r === 'admin'/.test(authjs), true);
 check('and Download all takes what the filters are showing',
   /function downloadAllHistory/.test(archivejs) && /historyRows\(\)/.test(archivejs), true);
 /* Somebody who only collects the finished forms is not shown a queue of
@@ -583,9 +584,11 @@ check('by the administrator and nobody else',
   (archivejs.match(/if \(Auth\.isAdmin\(\)\)/g) || []).length >= 2, true);
 check('and it names what is going before it goes',
   /Delete the \$\{what\} on file for \$\{when\}/.test(archivejs), true);
-check('and it is named for the person who gets them',
-  /'Submit to ' \+ collectorShort\(\)/.test(signingjs) &&
-  /finance: 'Jiha'/.test(authjs), true);
+/* The claim ends with the PA. Submitting is the last step: it files the
+   signed copy, closes the month, and hands it to nobody. */
+check('submitting closes the month rather than passing it on',
+  /'Submit and close the month'/.test(signingjs) &&
+  !/finance/.test(authjs + signingjs), true);
 check('and it files the scan before it closes the month',
   /await Sync\.store\([\s\S]{0,220}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/.test(signingjs), true);
 check('a confirmed month is not offered for upload again',

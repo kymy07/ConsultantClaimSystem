@@ -556,8 +556,7 @@ function statusRow (name, kind, sub, first) {
         typeof archiveHas === 'function' &&
         !archiveHas(name, statusMonth.y, statusMonth.m, 'invoice')) {
       const put = button('File it', 'ghost small', () => fileInvoiceNow(sub, put));
-      put.title = 'Put the approved invoice on file, so it reaches ' +
-                  (Auth.personFor('finance') || 'whoever collects the paper');
+      put.title = 'Put the approved invoice on file, so the month has its copy';
       acts.appendChild(put);
     }
     if (sub.status === 'returned' && (sub.created_by === myEmail() || Auth.isAdmin())) {

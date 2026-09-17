@@ -41,12 +41,11 @@ Everybody who sends a claim has an account, and each has one part in it:
 | `hanis.rashidan@uzmagroup.com` | `manager` | Reviews it first, and signs it before it goes on |
 | `fadhli.jamaluddin@uzmagroup.com` | `boss` | Approves it second — the HOD |
 | `fatin.zaini@uzmagroup.com` | `pa` | Places the HOD's signature on the **time sheet**, in the app or on paper |
-| `najihah.zakir@uzmagroup.com` | `finance` | Approves nothing and prepares nothing; collects the finished forms |
 
 ### A consultant sees their own work only — enforced here
 
 CCS shows a `consultant` only their own profile, their own rows in the status table and their own
-filed copies; the `admin`, the three approvers and `finance` see everybody's, because an approver
+filed copies; the `admin` and the three approvers see everybody's, because an approver
 who cannot read what they are signing is no use.
 
 Filtering in the browser is not filtering: the rows still arrive over the wire and anybody who
@@ -252,10 +251,10 @@ CCS keeps invoices out of the PA's queue as well, and draws that column as *not 
 rather than *waiting*. An invoice that reached `pending_signature` before the rule existed is
 refused to the PA and can be closed by the `admin`, who acts at any stage.
 
-A `finance` account approves nothing and submits nothing: no stage names that role, so
-`POST /ccs/submissions/{id}/action` is `403` and `POST /ccs/submissions` is `403`. It reads.
+**A claim finishes with the PA.** Nobody collects it afterwards, so there is no collecting role:
+what a finished month leaves behind is read from the archive by the `admin`.
 
-**`kind`** — `"invoice"` or `"claim"`, sent on `POST /ccs/submissions` and returned by **both**
+**`kind`** — `"invoice"`, `"claim"` or `"advice"`, sent on `POST /ccs/submissions` and returned by **both**
 read endpoints, the list included. The list is the one that matters: it deliberately returns no
 `data`, and a table of "whose September invoice is where" cannot be drawn from rows that do not
 say which document they are.

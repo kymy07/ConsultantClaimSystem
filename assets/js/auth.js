@@ -39,8 +39,7 @@ const ROLES = {
   'nizar.tarmizi@uzmagroup.com':     'consultant',
   'hanis.rashidan@uzmagroup.com':    'manager',
   'fadhli.jamaluddin@uzmagroup.com': 'boss',
-  'fatin.zaini@uzmagroup.com':       'pa',
-  'najihah.zakir@uzmagroup.com':     'finance'
+  'fatin.zaini@uzmagroup.com':       'pa'
 };
 const ALLOWED_USERS = Object.keys(ROLES);
 
@@ -69,8 +68,7 @@ const ROLE_NAMES = {
   consultant: 'Consultant',
   manager:    'Project Manager',
   boss:       'Head of Department',
-  pa:         'PA to the HOD',
-  finance:    'Group People & Finance'
+  pa:         'PA to the HOD'
 };
 
 /**
@@ -88,20 +86,18 @@ const ROLE_PEOPLE = {
   consultant: 'the consultant',
   manager:    'Muhammad Hanis Rashidan',
   boss:       'Gs. Mohammad Fadhli Jamaluddin',
-  pa:         'Fatin Zaini',
-  finance:    'Sharifah Najihah Syed Mohd Zakir'
+  pa:         'Fatin Zaini'
 };
 
 /* What the office calls them. A button is read in a second and pressed
    without being read twice, so it says the name the person would answer to
    rather than the name on their identity card or the name of their
-   department. "Submit to Jiha" is a sentence somebody can check; "Submit 1
-   to Group People & Finance" is a form field. Changed with ROLE_PEOPLE. */
+   department: a name somebody can check, rather than a form field.
+   Changed with ROLE_PEOPLE. */
 const ROLE_SHORT = {
   manager: 'Hanis',
   boss:    'Fadhli',
-  pa:      'Fatin',
-  finance: 'Jiha'
+  pa:      'Fatin'
 };
 
 /* The admin prepares claims like a consultant and can also move any claim at
@@ -120,9 +116,9 @@ const isAdmin  = r => r === 'admin';
 const places = r => r === 'pa' || r === 'admin';
 
 /* Whose job is the finished paper: reading the whole record back, and taking
-   a copy of it away. Nobody in this group approves anything — they collect
-   what the approvals produced. */
-const keepsRecords = r => r === 'admin' || r === 'finance';
+   a copy of it away. The claim finishes with the PA, and what it leaves
+   behind is the administrator's to keep. */
+const keepsRecords = r => r === 'admin';
 
 /* Who moves a claim along. Somebody who only collects the finished forms
    does not, and should not be shown a queue of decisions that will never be

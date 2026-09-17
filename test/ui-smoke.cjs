@@ -439,7 +439,7 @@ async function main() {
     await command('Page.enable'); await command('Runtime.enable'); await command('Network.enable');
     await command('Network.setBlockedURLs', { urls: ['https://*', 'http://bdos.*'] });
     const report = { output: OUTPUT, screens: [], interactions: [], runtimeErrors };
-    const roles = cropOnly ? ['admin', 'consultant'] : option('roles')?.split(',') || ['login', 'admin', 'consultant', 'manager', 'boss', 'pa', 'finance'];
+    const roles = cropOnly ? ['admin', 'consultant'] : option('roles')?.split(',') || ['login', 'admin', 'consultant', 'manager', 'boss', 'pa'];
     for (const width of [1440, 390]) {
       const height = width === 390 ? 844 : 960;
       await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 500 });

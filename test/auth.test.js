@@ -116,14 +116,13 @@ const run = expr => vm.runInContext(expr, ctx);
   check('case and spaces ignored',     run("isAllowed('  Hanis.Rashidan@UzmaGroup.com ')"), true);
   check('any other BDOS user refused', run("isAllowed('someone.else@uzmagroup.com')"), false);
   check('empty refused',               run("isAllowed('')"), false);
-  check('ten accounts, no more',       run('ALLOWED_USERS.length'), 10);
-  // Najihah collects the finished paper; she approves nothing and prepares
-  // nothing, so she gets the record and the way to take a copy of it
-  check('Najihah keeps the records',   run("ROLES['najihah.zakir@uzmagroup.com']"), 'finance');
-  check('and that is a job, not a name',
-        run("keepsRecords('finance') && keepsRecords('admin') && !keepsRecords('pa')"), true);
-  check('she approves nothing',
-        run("!approves('finance') && approves('manager') && approves('boss') && approves('pa')"), true);
+  check('nine accounts, no more',      run('ALLOWED_USERS.length'), 9);
+  /* The claim finishes with the PA. Nobody collects it afterwards, so the
+     account that used to has no part in the process and no way into it. */
+  check('the collector is off the list',
+        run("!ROLES['najihah.zakir@uzmagroup.com'] && !isAllowed('najihah.zakir@uzmagroup.com')"), true);
+  check('and keeping the whole record is the administrator alone',
+        run("keepsRecords('admin') && !keepsRecords('pa') && !keepsRecords('finance')"), true);
   // everybody who sends a claim has an account of their own now, and each of
   // them sees their own work and nobody else's
   check('Zharif prepares his own',     run("ROLES['zharif.zaidi@uzmagroup.com']"), 'consultant');
