@@ -72,7 +72,48 @@ function uploadRows () {
   };
   waitingSignature().forEach(x => put(x, 'claim'));
   waitingAdvice().forEach(x => put(x, 'advice'));
+
+  /* A closed document takes a signed copy too. The month is closed by the
+     HOD's approval, not by the scan arriving, and a scan can arrive late,
+     or be replaced by a better one — so in every month on the page, every
+     approved document of everybody on the roster is a place to put one,
+     whether it is still waiting or already closed. */
+  const months = new Set([...rows.values()].map(r => `${r.period_year}|${r.period_month}`));
+  const now = currentSigningMonth();
+  months.add(`${now.y}|${now.m}`);
+  const closed = (who, y, m, kind) => signingSubs.filter(s =>
+    kindOf(s) === kind && s.status === 'complete' &&
+    String(s.consultant || '').trim() === who &&
+    Number(s.period_year) === y && Number(s.period_month) === m)[0] || null;
+  months.forEach(key => {
+    const [y, m] = key.split('|').map(Number);
+    signingRoster().forEach(name => {
+      const who = String(name || '').trim();
+      const id = `${who}|${y}|${m}`;
+      if (!rows.has(id)) {
+        rows.set(id, { consultant: who, period_year: y, period_month: m, invoice_no: '',
+                       claim: null, advice: null });
+      }
+      const row = rows.get(id);
+      ['claim', 'advice'].forEach(kind => {
+        if (!row[kind]) row[kind] = closed(who, y, m, kind);
+        if (row[kind] && !row.invoice_no) row.invoice_no = row[kind].invoice_no || '';
+      });
+    });
+  });
   return [...rows.values()].sort(byMonthThenName);
+}
+
+/** the documents on the page whose signed copy is not on the record yet */
+function copiesOwed (rows) {
+  let n = 0;
+  rows.forEach(r => ['claim', 'advice'].forEach(kind => {
+    if (!r[kind]) return;
+    const filed = typeof archiveFor === 'function'
+      ? archiveFor(r.consultant, r.period_year, Number(r.period_month) - 1, kind) : null;
+    if (!filed) n++;
+  }));
+  return n;
 }
 
 function byMonthThenName (a, b) {
@@ -416,9 +457,17 @@ function downloadLine (name, month, kind, claim) {
   const who = `${name || 'consultant'}, ${MONTHS[Math.max(0, month.m - 1)]} ${month.y}`;
   const label = kind === 'advice' ? 'Payment Advice' : 'Time sheet';
 
-  const doc = kind === 'claim' ? claim : null;
+  /* Printable once the HOD has approved it, and still printable after the
+     month is closed: a copy can be needed late, or again. What is not
+     printable is a document that has not come back from the approvers. */
+  const closedClaim = kind === 'claim' && !claim ? signingSubs.filter(s =>
+    kindOf(s) === 'claim' && s.status === 'complete' &&
+    String(s.consultant || '').trim() === String(name || '').trim() &&
+    Number(s.period_year) === month.y && Number(s.period_month) === month.m)[0] || null : null;
+  const doc = kind === 'claim' ? (claim || closedClaim) : null;
   const advice = kind === 'advice' ? adviceFor(where) : null;
-  const ready = kind === 'claim' ? doc : (advice && advice.status === SIGNING_STATUS ? advice : null);
+  const printable = s => !!s && (s.status === SIGNING_STATUS || s.status === 'complete');
+  const ready = kind === 'claim' ? (printable(doc) ? doc : null) : (printable(advice) ? advice : null);
   const target = kind === 'claim' ? doc : advice;
 
   const words = kind === 'claim'
@@ -552,16 +601,16 @@ async function renderSignUpload () {
   });
   [...attached.keys()].forEach(id => { if (!live.has(id)) attached.delete(id); });
 
-  const count = waiting.reduce((n, r) => n + (r.claim ? 1 : 0) + (r.advice ? 1 : 0), 0);
+  const count = copiesOwed(waiting);
   const h1 = document.createElement('h3');
-  h1.textContent = `Waiting for signed copies (${count})`;
+  h1.textContent = `Signed copies still to come in (${count})`;
   host.appendChild(h1);
 
   if (!count) {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
-    empty.textContent = 'Nothing is waiting. Every time sheet and payment advice the HOD ' +
-      'approved has been filed.';
+    empty.textContent = 'Nothing is owed. Every time sheet and payment advice the HOD ' +
+      'approved has its signed copy on the record. A newer scan can still be put on any of them.';
     host.appendChild(empty);
   }
   /* Two lines per person, the same two the Download page prints: the signed
@@ -599,7 +648,12 @@ function uploadLine (row, kind) {
   const target = row[kind];
   const held = target && attached.get(target.id);
 
-  const doc = signingDocument(label, row.invoice_no || '', []);
+  /* A closed document with no scan on the record says so on its own line,
+     because "Closed" beside an empty box otherwise reads as finished. */
+  const meta = target && target.status === 'complete' && !filed && !held
+    ? [row.invoice_no, 'closed — signed copy not on the record yet'].filter(Boolean).join(' · ')
+    : (row.invoice_no || '');
+  const doc = signingDocument(label, meta, []);
   if (!target && !filed) doc.classList.add('signdoc-quiet');
 
   const words = held ? 'Ready to submit'

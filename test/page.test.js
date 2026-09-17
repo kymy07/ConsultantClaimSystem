@@ -738,9 +738,18 @@ check('submitting closes the month rather than passing it on',
   !/finance/.test(authjs) && !/pending_finance|'finance'/.test(signingjs), true);
 check('and it files the scan before it closes the month',
   /await Sync\.store\([\s\S]{0,220}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/.test(signingjs), true);
-check('a confirmed month is not offered for upload again',
+/* The month is closed by the HOD's approval, not by the scan arriving. A
+   scan can arrive late, or be replaced by a better one, so a closed document
+   still has a box for it; what is gone is the old card that re-offered the
+   whole month for approval. */
+check('and is still printable from the Download page',
+  /const printable = s => !!s && \(s\.status === SIGNING_STATUS \|\| s\.status === 'complete'\)/
+    .test(signingjs), true);
+check('a closed document still takes its signed copy',
   !/uploadCard\(/.test(signingjs) &&
-  /function uploadRows[\s\S]{0,900}waitingSignature\(\)\.forEach/.test(signingjs), true);
+  /function uploadRows[\s\S]{0,900}waitingSignature\(\)\.forEach/.test(signingjs) &&
+  /s\.status === 'complete' &&[\s\S]{0,120}Number\(s\.period_month\) === m/.test(signingjs) &&
+  /function copiesOwed/.test(signingjs), true);
 check('and the newest copy is the one everybody reads',
   /sort\(newestFirst\)\[0\]/.test(archivejs) &&
   /latestCopies\(archive\)/.test(archivejs), true);
