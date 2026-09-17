@@ -116,7 +116,10 @@ const STEPS = [
   { id: 'mysign',     label: 'Signature', signs: true },
   { id: 'advice',     label: 'Payment Advice', signs: true },
   { id: 'todownload', label: 'Download', signs: true },
-  { id: 'toupload',   label: 'Upload',   signs: true },
+  /* "Re-Upload", because every document on it went out of this app first:
+     it was downloaded, signed on paper or in another program, and is coming
+     back. Plain "Upload" read as a place to put something new. */
+  { id: 'toupload',   label: 'Re-Upload', signs: true },
   /* Not a step either: the job behind, rather than the job in front. */
   /* Called History for the PA, who has no other: it is where a confirmed
      month lives, under the person's name. The administrator already has a
@@ -380,7 +383,7 @@ function renderNavRows () {
       choose: 'Choose documents', claim: 'Complete claim form', invoice: 'Review invoice',
       generate: 'Preview & download', submit: 'Review submission',
       resubmit: 'Review returned documents', todownload: 'Download documents',
-      toupload: 'Upload signed documents', mysign: 'Your signature'
+      toupload: 'Re-upload signed documents', mysign: 'Your signature'
     };
     next.textContent = (nextLabels[list[nextAt].id] || list[nextAt].label) + ' →';
     /* On step 1, Next is not offered while there is a reason it would be

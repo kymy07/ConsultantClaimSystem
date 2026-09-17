@@ -783,8 +783,14 @@ check('the HOD signs it on paper and the PA files the scan',
   !/async function signAdvice/.test(signingjs) &&
   !/openAdviceSigning/.test(signingjs) &&
   /function waitingAdvice[\s\S]{0,200}kindOf\(s\) === 'advice'/.test(signingjs), true);
+/* Every document on that step went out of this app first and is coming
+   back signed, so it is called what it is. */
+check('the upload step is called Re-Upload',
+  /id: 'toupload',\s+label: 'Re-Upload'/.test(appjs) &&
+  /<h2>Re-upload the signed copies<\/h2>/.test(html) &&
+  !/<b>Upload<\/b>/.test(html), true);
 check('and the two are separate steps, in the order the job happens',
-  /\{ id: 'mysign'[\s\S]{0,140}\{ id: 'advice'[\s\S]{0,140}\{ id: 'todownload'[\s\S]{0,120}\{ id: 'toupload'/
+  /\{ id: 'mysign'[\s\S]{0,140}\{ id: 'advice'[\s\S]{0,140}\{ id: 'todownload'[\s\S]{0,400}\{ id: 'toupload'/
     .test(appjs), true);
 /* Three documents produced weeks apart is one folder to anybody who was
    asked for "September", so the administrator's record compiles one. */

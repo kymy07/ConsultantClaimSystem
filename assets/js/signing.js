@@ -408,7 +408,8 @@ function downloadLine (name, month, kind, claim) {
     : advice ? adviceWords(advice) : 'Not written yet';
 
   if (!ready) {
-    const quiet = signingDocument(label, 'Not ready to print yet',
+    const closed = target && target.status === 'complete';
+    const quiet = signingDocument(label, closed ? 'Signed and filed' : 'Not ready to print yet',
       target ? [labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
                              () => reviewSubmission(target.id))] : []);
     quiet.classList.add('signdoc-quiet');
@@ -1199,13 +1200,13 @@ async function renderAdvice () {
       }
     } else if (advice.status === SIGNING_STATUS) {
       /* The HOD signs this on paper, not here, so the last thing that
-         happens to it happens on the Upload step with the signed time
+         happens to it happens on the Re-Upload step with the signed time
          sheet. This row says so rather than offering a button that would
          do half of it. */
       const said = document.createElement('p');
       said.className = 'signhint';
       said.textContent = 'Approved. Print it, have the HOD sign it, and file the signed copy ' +
-        'on the Upload step.';
+        'on the Re-Upload step.';
       bar.appendChild(said);
     }
     if (bar.children.length) cell.appendChild(bar);
