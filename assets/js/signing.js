@@ -397,8 +397,7 @@ function adviceSignatureWarning () {
   if (myLastSignature()) return null;
   const note = document.createElement('p');
   note.className = 'keynote warn';
-  note.textContent = 'Your signature is not on this browser yet, so the Prepared by box will ' +
-    'print empty. Put it on the Signature step first.';
+  note.textContent = 'Add your signature on the Signature step so the Prepared by box does not print blank.';
   return note;
 }
 
@@ -418,8 +417,7 @@ async function renderSignDownload () {
   if (!rows.length) {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
-    empty.textContent = 'Nothing is waiting for the HOD\u2019s signature. Everybody is listed below ' +
-      'with where their documents have got.';
+    empty.textContent = 'No time sheets awaiting the HOD\u2019s signature. Document statuses are shown below.';
     host.appendChild(empty);
   } else {
     const count = document.createElement('p');
@@ -603,14 +601,13 @@ async function renderSignUpload () {
 
   const count = copiesOwed(waiting);
   const h1 = document.createElement('h3');
-  h1.textContent = `Signed copies still to come in (${count})`;
+  h1.textContent = `Awaiting signed copies (${count})`;
   host.appendChild(h1);
 
   if (!count) {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
-    empty.textContent = 'Nothing is owed. Every time sheet and payment advice the HOD ' +
-      'approved has its signed copy on the record. A newer scan can still be put on any of them.';
+    empty.textContent = 'All signed copies are filed. You can replace a scan below.';
     host.appendChild(empty);
   }
   /* Two lines per person, the same two the Download page prints: the signed
@@ -734,8 +731,7 @@ function uploadSlot (row, kind, filed, target, file) {
     pick.appendChild(inp);
     const hint = document.createElement('small');
     hint.className = 'signhint';
-    hint.textContent = (filed ? 'Choose the replacement. ' : `Choose the signed ${what}. `) +
-      'PDF or image, up to 12 MB.';
+    hint.textContent = (filed ? 'Replacement: ' : 'Signed copy: ') + 'PDF or image, up to 12 MB.';
     pick.appendChild(hint);
     cell.appendChild(pick);
   }
@@ -823,9 +819,8 @@ function submitBar () {
   said.className = 'signsaid';
   said.setAttribute('role', 'status');
   said.textContent = ready
-    ? ready + ' signed cop' + (ready === 1 ? 'y is' : 'ies are') + ' ready. Submitting files ' +
-      (ready === 1 ? 'it' : 'them') + ' and closes the month — the last step, after which it ' +
-      'lives in History. Submit before leaving or reloading this page.'
+    ? ready + ' signed cop' + (ready === 1 ? 'y' : 'ies') + ' ready. Submit to file in History and close the month. ' +
+      'Submit before leaving or reloading.'
     : 'Choose signed copies above, then submit to close those months.';
   bar.appendChild(said);
 
@@ -986,8 +981,7 @@ async function renderFiled () {
 
   const rows = filedRecords();
   if (!rows.length) {
-    host.innerHTML = '<p class="emptynote">Nothing has gone through here yet. ' +
-      'A signed time sheet appears in this list once it is submitted on the Upload page.</p>';
+    host.innerHTML = '<p class="emptynote">No signed time sheets filed yet. Submit them on the Re-Upload step.</p>';
     return;
   }
 
@@ -1221,7 +1215,7 @@ function adviceStatusWords (invoice, advice) {
 function adviceLockedCell () {
   const cell = document.createElement('div');
   cell.className = 'signcell';
-  cell.appendChild(signingDocument('Locked', 'Unlocks once the HOD has approved the invoice', []));
+  cell.appendChild(signingDocument('Locked', 'Available after HOD invoice approval', []));
   return cell;
 }
 
@@ -1242,8 +1236,8 @@ async function renderAdvice () {
     return a ? a.status === SIGNING_STATUS : adviceUnlocked(sub);
   }).length;
   count.textContent = waiting
-    ? `${waiting} payment advice${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} you.`
-    : 'Nothing needs you here.';
+    ? `${waiting} payment advice${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} action.`
+    : 'No payment advice needs action.';
   host.appendChild(count);
 
   /* Everybody with a profile is on the table whether or not their invoice has
@@ -1264,8 +1258,8 @@ async function renderAdvice () {
       advice ? 'Payment Advice' : adviceUnlocked(sub) ? 'Not prepared yet' : 'Locked',
       advice ? (advice.invoice_no || sub.invoice_no || '')
         : adviceUnlocked(sub) ? 'From invoice ' + (sub.invoice_no || '')
-          : sub.status === 'returned' ? 'Unlocks when the invoice comes round again'
-            : 'Unlocks once the HOD has approved the invoice',
+          : sub.status === 'returned' ? 'Awaiting invoice resubmission'
+            : 'Available after HOD invoice approval',
       actions));
 
     const bar = document.createElement('div');
@@ -1282,8 +1276,7 @@ async function renderAdvice () {
          do half of it. */
       const said = document.createElement('p');
       said.className = 'signhint';
-      said.textContent = 'Written. Print it from the Download step, have the HOD sign it, and file the signed copy ' +
-        'on the Re-Upload step.';
+      said.textContent = 'Next: Download, get the HOD signature, then Re-Upload the signed copy.';
       bar.appendChild(said);
     }
     if (bar.children.length) cell.appendChild(bar);
@@ -2262,4 +2255,3 @@ function duplicateProfileNote (name, after) {
   }));
   return note;
 }
-

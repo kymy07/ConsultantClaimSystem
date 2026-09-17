@@ -80,7 +80,7 @@ const STEPS = [
      month before saying which days of it they had worked. */
   { id: 'claim',      label: 'Claim Form', modes: ['claim', 'both'] },
   { id: 'invoice',    label: 'Invoice',    modes: ['invoice', 'both'] },
-  { id: 'generate',   label: 'Generate' },
+  { id: 'generate',   label: 'Review' },
   /* Downloading the documents and sending the claim away are two different
      decisions, and they were on one screen. Generating is something you do
      several times while a month is still being argued about; submitting
@@ -175,16 +175,21 @@ function canLeave (id) {
   if (id === 'consultant') {
     const missing = profileProblems();
     if (missing.length) {
-      toast('This profile still needs ' + missing.join(', ') + '.', true);
+      toast('Required: ' + missing.join(', ') + '.', true);
       paintProfileGate();
       const first = !String(S.consultant.name || '').trim() ? 'c_name'
+        : !uniqueIdOf(S) && Auth.setsNumbering() ? 'c_uniqueId'
         : !(Number(S.invoice.monthlyRate) > 0) ? 'c_rate' : '';
       const box = first && document.getElementById(first);
-      if (box) box.focus();
+      if (box) {
+        const disclosure = box.closest('details');
+        if (disclosure) disclosure.open = true;
+        box.focus();
+      }
       return false;
     }
     if (profileDirty) {
-      toast('Press Save Profile first — a draft is not a profile.', true);
+      toast('Press Save Profile first to keep your changes.', true);
       paintProfileGate();
       const save = document.getElementById('btnSaveProfile');
       if (save) save.focus();
@@ -607,9 +612,8 @@ function paintProfileGate () {
   box.hidden = false;
   box.className = 'keynote warn';
   box.textContent = missing.length
-    ? 'Before this claim can go anywhere, this profile still needs ' +
-      missing.join(', ') + (profileDirty ? ' — and the changes on screen are not saved yet.' : '.')
-    : 'The changes on screen are not saved yet. Press Save Profile to keep them.';
+    ? 'Required: ' + missing.join(', ') + (profileDirty ? '. Save your changes to continue.' : '.')
+    : 'Save your profile changes to continue.';
 }
 
 /* =======================================================================
@@ -738,9 +742,7 @@ function paintAdminFields () {
   if (note) {
     note.hidden = may;
     note.className = 'keynote';
-    note.textContent = 'These three are set by the administrator. The unique ID makes your ' +
-      'invoice numbers, the count keeps them in sequence, and the account is the sign-in this ' +
-      'profile belongs to — so none of them is yours to change.';
+    note.textContent = 'The administrator manages your unique ID, claim count and linked account.';
   }
 }
 
@@ -751,19 +753,16 @@ function paintInvoiceNo () {
   const auto = invoiceNumberOf(S);
   if (!auto) {
     box.className = 'keynote warn';
-    box.textContent =
-      'Give this person a Unique ID and their invoice number writes itself: ' +
-      `${S.timesheet.year}-01-${String(claimSeqOf(S)).padStart(3, '0')} is ` +
-      `claim ${claimSeqOf(S)} of ${S.timesheet.year} from person 01.`;
+    box.textContent = Auth.setsNumbering()
+      ? 'Add a Unique ID to generate the invoice number.'
+      : 'Ask the administrator to set your Unique ID for invoice numbering.';
     return;
   }
   const typed = S.invoice.autoNo === false && S.invoice.no && S.invoice.no !== auto;
   box.className = 'keynote' + (typed ? ' warn' : '');
   box.textContent = typed
-    ? `This claim carries "${S.invoice.no}", typed in by hand. The number it would ` +
-      `otherwise have is ${auto}.`
-    : `This claim is ${auto} — claim ${claimSeqOf(S)} of ${S.timesheet.year} ` +
-      `from person ${uniqueIdOf(S)}.`;
+    ? `Manual invoice no.: ${S.invoice.no}. Suggested: ${auto}.`
+    : `Invoice no.: ${auto}`;
 }
 
 /* ---------------- invoice item rows ---------------- */
@@ -795,7 +794,7 @@ function renderItems () {
       // The sum is the starting point, not the last word: a month can be
       // settled at something else, and typing over it says so rather than
       // being quietly overwritten on the next keystroke elsewhere.
-      amtEl.title = 'Worked out from the rate and the paid days — type over it if this month was agreed at something else.';
+      amtEl.title = 'Calculated from your rate and paid days. Enter a different agreed amount if needed.';
     }
 
     tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
@@ -868,10 +867,10 @@ function paintOverride (calc, overridden) {
   if (!overridden) return;
   box.innerHTML = '<span></span> ';
   box.querySelector('span').textContent =
-    `Typed over. The days on the sheet come to RM ${money(calc.amount || 0)}.`;
+    `Manual amount. Calculated: RM ${money(calc.amount || 0)}.`;
   const undo = document.createElement('button');
   undo.className = 'btn ghost small';
-  undo.textContent = 'Use the calculated amount';
+  undo.textContent = 'Use calculated amount';
   undo.addEventListener('click', () => {
     S.invoice.override = null;
     syncAutoAmount();
@@ -967,8 +966,8 @@ function paintSubmitPick () {
     label.appendChild(name);
     const what = document.createElement('span');
     what.textContent = kind === 'invoice'
-      ? 'the bill, with the bank details and the amount'
-      : 'the Uzma time sheet, with the day grid and the approval block';
+      ? 'Amount and bank details'
+      : 'Days worked and approvals';
     label.appendChild(what);
     host.appendChild(label);
   });
@@ -976,9 +975,7 @@ function paintSubmitPick () {
   if (available.length < 2) {
     const only = document.createElement('p');
     only.className = 'pickonly';
-    only.textContent =
-      'Step 2 asked for one document, so that is the one that goes. Go back and ' +
-      'choose Both to send the other one as well.';
+    only.textContent = 'To send both documents, choose Both in step 2.';
     host.appendChild(only);
   }
 }
@@ -998,12 +995,12 @@ function renderSubmitStep () {
   const rows = [
     ['Consultant', S.consultant.name || '(no name)'],
     ['Month', `${MONTHS[S.timesheet.month]} ${S.timesheet.year}`],
-    ['Going', going.length ? going.map(kindLabel).join(' + ') : 'nothing chosen'],
+    ['Documents', going.length ? going.map(kindLabel).join(' + ') : 'None selected'],
     ['Invoice No.', S.invoice.no || '(none)'],
     ['Period', fmtPeriod(S.invoice.pStart, S.invoice.pEnd) || '(none)'],
     ['Total days [A]', String(t.A)],
     ['Total due', 'RM ' + money(T.total)],
-    ['Goes to', S.timesheet.reviewName || 'the project manager']
+    ['Reviewer', S.timesheet.reviewName || 'Project manager']
   ];
   facts.innerHTML = '';
   rows.forEach(([k, v]) => {
@@ -1017,27 +1014,28 @@ function renderSubmitStep () {
   /* Not blocking — an approver can still be sent something imperfect, and
      usually the person submitting knows why. Saying it once is enough. */
   const problems = [];
-  if (!String(S.consultant.name || '').trim()) problems.push('the profile has no name');
+  if (!String(S.consultant.name || '').trim()) problems.push('add your name in Profile');
   if (!String(S.invoice.no || '').trim()) {
-    problems.push('there is no invoice number — fill the Unique ID in on the Profile step');
+    problems.push(Auth.setsNumbering()
+      ? 'add a Unique ID in Profile for invoice numbering'
+      : 'ask the administrator to set your Unique ID for invoice numbering');
   }
-  if (!going.length) problems.push('no document is ticked, so there is nothing to send');
+  if (!going.length) problems.push('select a document to send');
   if (going.indexOf('claim') >= 0 && !S.sig.personnel) {
-    problems.push('nobody has signed the PERSONNEL box on the time sheet');
+    problems.push('add your signature to the PERSONNEL box');
   }
   const over = leaveStandings(S).filter(L => L.over);
   over.forEach(L => problems.push(
     `${L.name} is over the ${L.limit}-day allowance by ${L.taken - L.limit}`));
   const blank = unmarkedDays(S.timesheet);
   if (blank.length) {
-    problems.push(`${blank.length} working day${blank.length > 1 ? 's are' : ' is'} unmarked, ` +
-                  'and unmarked days are not paid');
+    problems.push(`${blank.length} unmarked working day${blank.length > 1 ? 's' : ''} will be unpaid`);
   }
 
   if (warn) {
     warn.hidden = !problems.length;
     warn.textContent = problems.length
-      ? 'Before you send it: ' + problems.join('; ') + '.'
+      ? 'Before submitting: ' + problems.join('; ') + '.'
       : '';
   }
 
@@ -1365,7 +1363,7 @@ function boot () {
   document.getElementById('btnSubmitClaim').addEventListener('click', async () => {
     if (!validate()) return;
     if (!Sync.on) {
-      toast('The shared database is not reachable, so there is nowhere to send it yet.', true);
+      toast('Cannot connect to submit. Check your connection and try again.', true);
       return;
     }
     const going = pickedKinds();
@@ -1721,9 +1719,7 @@ function renderProfileCards () {
   if (box) {
     box.hidden = !(activeProfile || String(S.consultant.name || '').trim());
     const head = document.getElementById('detailsHead');
-    if (head && activeProfile) {
-      head.firstChild.textContent = `The details on ${activeProfile} `;
-    }
+    if (head) head.textContent = 'Personal details';
   }
   renderLeave(S, 'leaveBoxProfile');
 }
@@ -1776,8 +1772,8 @@ function refreshProfileList () {
   if (save) save.textContent = activeProfile ? 'Save changes' : 'Save Profile';
   if (hint) {
     hint.textContent = activeProfile
-      ? `Saves the details above back to "${activeProfile}".`
-      : 'Saves the details above under the Full Name, to open again next month.';
+      ? `Updates "${activeProfile}".`
+      : 'Save once and reuse next month.';
   }
 
   if (!menu) return;

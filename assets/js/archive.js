@@ -35,9 +35,7 @@ async function renderArchive (force) {
   if (!Sync.on) {
     archiveLoaded = false;
     host.innerHTML = Sync.offlineNote(
-      'Signed copies are kept in the shared database, which this browser cannot ' +
-      'reach right now. Nothing has been lost &mdash; the files are still wherever ' +
-      'they were downloaded to.');
+      'Cannot connect to signed copies. Previously downloaded files remain on your device.');
     return;
   }
 
@@ -175,8 +173,7 @@ function paintArchive () {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
     empty.textContent = `No signed copies for ${MONTHS[when.m]} ${when.y} yet. ` +
-      (canFileSigned() ? 'Upload signed documents using the form above.'
-        : 'Signed copies will appear here when they are uploaded.');
+      (canFileSigned() ? 'Upload them above.' : 'Check again after they are filed.');
     host.appendChild(empty);
     return;
   }
@@ -221,15 +218,14 @@ async function renderHistory (force) {
   if (head) head.textContent = collecting ? 'Documents to collect' : 'History';
   if (lead) {
     lead.textContent = collecting
-      ? 'Find signed time sheets and invoices by consultant or year. View individual files or download the results as one ZIP.'
-      : 'Browse signed documents across all months. Filter by consultant or year, then view or download the files you need.';
+      ? 'Filter signed documents, then view or download them as one ZIP.'
+      : 'Find signed documents by consultant and year.';
   }
 
   if (!Sync.on) {
     archiveLoaded = false;
     host.innerHTML = Sync.offlineNote(
-      'The history lives in the shared database, which this browser cannot reach ' +
-      'right now.');
+      'Cannot connect to document history. Check your connection and try again.');
     return;
   }
 
@@ -249,8 +245,8 @@ async function renderHistory (force) {
   }
 
   if (!Sync.archiveOn) {
-    workflowMessage(host, 'Document history is not available yet. Contact your administrator ' +
-      'to enable signed copy storage. Your existing files should be kept on your device.');
+    workflowMessage(host, 'History is not enabled yet. Ask your administrator to enable it. ' +
+      'Keep your files on this device for now.');
     return;
   }
   paintHistory();
@@ -302,8 +298,8 @@ function paintHistory () {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
     empty.textContent = (historyWho || historyYear)
-      ? 'No signed documents match these filters. Choose another consultant or year.'
-      : 'No signed documents have been filed yet. Completed documents will appear here after they are filed.';
+      ? 'No matching documents. Try another consultant or year.'
+      : 'No signed documents filed yet.';
     host.appendChild(empty);
     if (historyWho || historyYear) host.appendChild(button('Clear filters', 'ghost small', () => {
       historyWho = '';
@@ -809,17 +805,15 @@ function archiveUploadCard () {
   card.className = 'archupload';
 
   const head = document.createElement('h4');
-  head.textContent = 'File the signed copies';
+  head.textContent = 'File signed copies';
   card.appendChild(head);
 
   const lead = document.createElement('p');
   lead.className = 'archlead';
   lead.textContent =
-    'They are filed under ' +
-    (String(S.consultant.name || '').trim() || '(no name — pick a profile first)') +
-    ' for ' + MONTHS[S.timesheet.month] + ' ' + S.timesheet.year +
-    (S.invoice.no ? ', invoice ' + S.invoice.no : '') +
-    '. Change the profile or the month on the earlier steps to file another one.';
+    (String(S.consultant.name || '').trim() || 'Select a profile first') +
+    ' · ' + MONTHS[S.timesheet.month] + ' ' + S.timesheet.year +
+    (S.invoice.no ? ' · ' + S.invoice.no : '');
   card.appendChild(lead);
 
   const pickers = document.createElement('div');
@@ -850,7 +844,7 @@ function archiveUploadCard () {
 
   const hint = document.createElement('p');
   hint.className = 'fieldhint';
-  hint.textContent = 'Upload a PDF or image, up to 12 MB per file. Check the consultant and month above before filing.';
+  hint.textContent = 'PDF or image · max 12 MB each. Check the consultant and month; change them in the form if needed.';
   card.appendChild(hint);
 
   const bar = document.createElement('div');

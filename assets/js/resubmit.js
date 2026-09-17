@@ -59,7 +59,8 @@ function borrowDocument (kind, host) {
   // the heading belongs to the step, not to a card that has its own; the
   // nav row is rebuilt from scratch every time a step is shown
   const moved = [...panel.children].filter(
-    el => el.tagName !== 'H2' && !el.classList.contains('navrow'));
+    el => el.tagName !== 'H2' && !el.classList.contains('panel-heading') &&
+      !el.classList.contains('navrow'));
   moved.forEach(el => host.appendChild(el));
   host.hidden = false;
 
@@ -145,8 +146,7 @@ async function renderResubmit () {
 
   if (!Sync.on) {
     host.innerHTML = Sync.offlineNote(
-      'A document that came back lives in the shared database, which this browser cannot ' +
-      'reach right now.');
+      'Cannot connect to returned documents. Check your connection and try again.');
     return;
   }
 
@@ -166,7 +166,7 @@ async function renderResubmit () {
     const ok = document.createElement('p');
     ok.className = 'emptynote';
     ok.setAttribute('role', 'status');
-    ok.textContent = 'No changes requested. Documents returned by an approver will appear here with the reason and next steps.';
+    ok.textContent = 'No changes requested. Returned documents will appear here.';
     host.appendChild(ok);
     return;
   }
@@ -228,10 +228,10 @@ function returnedCard (sub) {
 
   const who = document.createElement('p');
   who.className = 'backwho';
-  who.textContent = 'Sent back by ' + (back.by || 'an approver') +
+  who.textContent = 'Returned by ' + (back.by || 'an approver') +
     (back.at ? ' on ' + new Date(back.at).toLocaleDateString() : '') +
     (back.from && STAGE_BY_KEY[back.from]
-      ? ' — it had got as far as ' + Auth.roleName(STAGE_BY_KEY[back.from].who) : '');
+      ? ' · ' + Auth.roleName(STAGE_BY_KEY[back.from].who) : '');
   card.appendChild(who);
 
   const why = document.createElement('blockquote');
@@ -250,8 +250,7 @@ function returnedCard (sub) {
   if (open) {
     const now = document.createElement('p');
     now.className = 'backnow';
-    now.textContent = `Update the ${kindLabel(kind).toLowerCase()} below to address the reason above. ` +
-      'Then send your updated document for approval.';
+    now.textContent = `Update the ${kindLabel(kind).toLowerCase()} below, then resubmit for approval.`;
     card.appendChild(now);
   }
   card.appendChild(editHost);
@@ -259,7 +258,7 @@ function returnedCard (sub) {
   const note = document.createElement('textarea');
   note.className = 'decidenote';
   note.rows = 2;
-  note.placeholder = 'Briefly explain the changes for your approver';
+  note.placeholder = 'Briefly describe your changes';
   const noteLabel = document.createElement('label');
   noteLabel.className = 'fieldlabel';
   noteLabel.appendChild(document.createTextNode('What changed? (optional)'));
@@ -277,7 +276,7 @@ function returnedCard (sub) {
      not about it. Once it is open there is nothing to press — it is there. */
   if (!open) bar.appendChild(button('Open and fix', 'ghost small', () => openToFix(sub)));
 
-  const send = button('Send it back for approval', 'primary',
+  const send = button('Resubmit for approval', 'primary',
                       () => resubmitOne(sub, note.value.trim(), send));
   bar.appendChild(send);
   /* Rows left behind by setting the thing up look exactly like real ones.

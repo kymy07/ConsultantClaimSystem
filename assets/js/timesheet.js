@@ -362,8 +362,7 @@ function renderSummary (S) {
       const warn = document.createElement('span');
       warn.className = 'holwarn';
       warn.textContent =
-        `The movable holidays for ${ts.year} are not in the calendar yet, so only the fixed ` +
-        'dates were set. Check the rest against the gazette and mark them PH yourself.';
+        `Only fixed-date holidays are available for ${ts.year}. Check the gazette and mark any missing holidays PH.`;
       holNote.appendChild(warn);
     }
   }
@@ -376,8 +375,7 @@ function renderSummary (S) {
     if (blank.length) {
       warn.textContent =
         `${blank.length} working day${blank.length > 1 ? 's are' : ' is'} unmarked ` +
-        `(${blank.join(', ')}) — unmarked days are not paid. Tick “/” for a day worked, ` +
-        `or say why it was not.`;
+        `(${blank.join(', ')}). Unmarked days are unpaid. Select “/” for work or another day mark.`;
     }
   }
 
@@ -409,16 +407,12 @@ function renderLeave (S, hostId) {
   const pto = leaveAllowance(S, 'PTO');
   const mc = leaveAllowance(S, 'MC');
   const days = n => `${n} day${n === 1 ? '' : 's'}`;
-  const both = pto === mc ? `are ${days(pto)} each a year`
-    : `are ${days(pto)} and ${days(mc)} a year`;
+  const helpOpen = !!host.querySelector('.help-disclosure[open]');
 
   host.innerHTML = `
     <div class="leavehead">
       <b>Leave in ${ts.year}</b>
-      <span><b>PTO</b> and <b>MC</b> ${both}, are paid,
-        and count into [A]; a day cannot be marked once its allowance is spent.
-        <b>UL</b> has no allowance &mdash; nobody is paid for it, so there is nothing
-        to ration &mdash; and it does not count into [A].</span>
+      <span>Yearly allowance: <b>PTO</b> ${days(pto)} &middot; <b>MC</b> ${days(mc)}.</span>
     </div>
     <div class="leaveset" hidden></div>
     <table class="leavetable">
@@ -428,13 +422,20 @@ function renderLeave (S, hostId) {
       </tr></thead>
       <tbody></tbody>
     </table>
-    <p class="leavefoot"></p>`;
+    <p class="leavefoot"></p>
+    ${hostId === 'leaveBoxProfile' ? `<details class="help-disclosure"${helpOpen ? ' open' : ''}>
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Leave guide</span></summary>
+      <div class="help-content">
+        <p><b>PTO and MC</b> are paid and count towards [A]. You cannot add more once the yearly allowance is used.</p>
+        <p><b>UL</b> is unpaid, has no limit and does not count towards [A]. Balances include leave from submitted months.</p>
+      </div>
+    </details>` : ''}`;
 
   const foot = host.querySelector('.leavefoot');
   foot.textContent = carried.length
-    ? 'Carried forward from months already submitted: ' +
+    ? 'From submitted months: ' +
       carried.map(x => `${x.n} ${x.mark}`).join(', ') + '.'
-    : `Nothing carried forward — ${ts.year} starts here.`;
+    : `No leave carried forward in ${ts.year}.`;
 
   mountLeaveAllowance(S, host);
 

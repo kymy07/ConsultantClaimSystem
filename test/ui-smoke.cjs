@@ -365,6 +365,222 @@ async function auditCropper({ command, evaluate, pressKey, width, report }) {
   })()`));
 }
 
+async function auditDisclosures({ evaluate, pressKey, width, role, panel, report }) {
+  const check = (test, passed, detail = {}) => {
+    report.interactions.push({ width, role, panel, test, passed, ...detail });
+    console.log(JSON.stringify({ width, role, panel, test, passed }));
+  };
+  const scope = panel === 'login' ? '.auth-card' : '.panel.active';
+  const helpSelector = scope + ' details.help-disclosure';
+  const help = await evaluate(`(() => {
+    return [...document.querySelectorAll(${JSON.stringify(helpSelector)})].map((details, index) => ({
+      index,
+      name: details.querySelector('summary')?.textContent.trim(),
+      visible: details.querySelector('summary')?.checkVisibility() || false,
+      closed: !details.open,
+      contentHidden: !!details.querySelector('.help-content') && !details.querySelector('.help-content').checkVisibility()
+    })).filter(item => item.visible);
+  })()`);
+  if (['login', 'consultant', 'invoice', 'claim'].includes(panel)) {
+    check('Contextual help is available', help.length > 0);
+  }
+  for (const item of help) {
+    const target = `document.querySelectorAll(${JSON.stringify(helpSelector)})[${item.index}]`;
+    check(item.name + ' starts collapsed', item.closed && item.contentHidden);
+    await evaluate(`${target}.querySelector('summary').focus()`);
+    await pressKey('Enter', 'Enter', 13);
+    const opened = await evaluate(`(() => {
+      const details = ${target};
+      const summary = details.querySelector('summary');
+      const content = details.querySelector('.help-content');
+      const rect = content.getBoundingClientRect();
+      return {
+        open: details.open,
+        visible: content.checkVisibility(),
+        focused: document.activeElement === summary,
+        left: rect.left, right: rect.right, contentRectWidth: rect.width,
+        contentWidth: content.scrollWidth, availableWidth: content.clientWidth,
+        documentWidth: document.documentElement.scrollWidth, viewport: innerWidth
+      };
+    })()`);
+    check(item.name + ' opens with Enter', opened.open && opened.visible && opened.focused, opened);
+    check(item.name + ' expanded content fits the viewport',
+      opened.contentRectWidth > 0 && opened.left >= -2 && opened.right <= opened.viewport + 2 &&
+      opened.contentWidth <= opened.availableWidth + 2 && opened.documentWidth <= opened.viewport + 2,
+      opened);
+    await pressKey(' ', 'Space', 32);
+    const closed = await evaluate(`(() => {
+      const details = ${target};
+      return { closed: !details.open, hidden: !details.querySelector('.help-content').checkVisibility(),
+        focused: document.activeElement === details.querySelector('summary') };
+    })()`);
+    check(item.name + ' closes with Space', closed.closed && closed.hidden && closed.focused, closed);
+    // A failed interaction must not leave another screenshot expanded.
+    await evaluate(`${target}.open = false`);
+  }
+
+  if (panel === 'consultant') {
+    const leave = await evaluate(`(() => {
+      const host = document.getElementById('leaveBoxProfile');
+      const table = host?.querySelector('.leavetable');
+      if (!host?.checkVisibility() || !table) return { passed: false, missingLeaveTable: true };
+      const bounds = host.getBoundingClientRect();
+      const left = bounds.left + host.clientLeft;
+      const right = left + host.clientWidth;
+      const fits = rect => rect.width > 0 && rect.left >= left - 1 && rect.right <= right + 1;
+      const tableRect = table.getBoundingClientRect();
+      const lastColumn = [...table.querySelectorAll('tr > :last-child')].map(cell => {
+        const rect = cell.getBoundingClientRect();
+        const text = document.createRange();
+        text.selectNodeContents(cell);
+        const textRect = text.getBoundingClientRect();
+        return { label: cell.textContent.trim(), left: rect.left, right: rect.right,
+          textRight: textRect.right, fits: fits(rect) && fits(textRect) };
+      });
+      const tableFits = fits(tableRect) && table.scrollWidth <= host.clientWidth + 1;
+      return { left, right, tableRight: tableRect.right, tableFits, lastColumn,
+        passed: tableFits && lastColumn.length >= 4 && lastColumn.every(cell => cell.fits) };
+    })()`);
+    check('Profile leave table and final column remain inside their card', leave.passed, leave);
+  }
+
+  if (panel !== 'generate') return;
+  const formats = [
+    { card: 'card_claim', preview: 'btnClaimPreview', buttons: ['btnClaimPdf', 'btnClaimDocx'] },
+    { card: 'card_inv', preview: 'btnInvPreview', buttons: ['btnInvPdf', 'btnInvXlsx'] }
+  ];
+  for (const format of formats) {
+    const selector = '#' + format.card + ' details.download-options';
+    const initial = await evaluate(`(() => {
+      const card = document.getElementById(${JSON.stringify(format.card)});
+      const details = document.querySelector(${JSON.stringify(selector)});
+      const buttons = ${JSON.stringify(format.buttons)}.map(id => document.getElementById(id));
+      return { visible: card.checkVisibility(), exists: !!details, closed: !!details && !details.open,
+        previewVisible: document.getElementById(${JSON.stringify(format.preview)}).checkVisibility(),
+        buttonsPreserved: buttons.every(button => !!button && details?.contains(button)),
+        downloadsHidden: buttons.every(button => !!button && !button.checkVisibility()) };
+    })()`);
+    if (!initial.visible) continue;
+    check(format.card + ' keeps preview visible and download choices collapsed',
+      initial.exists && initial.closed && initial.previewVisible && initial.buttonsPreserved && initial.downloadsHidden,
+      initial);
+    if (!initial.exists) continue;
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).querySelector('summary').focus()`);
+    await pressKey('Enter', 'Enter', 13);
+    const expanded = await evaluate(`(() => {
+      const details = document.querySelector(${JSON.stringify(selector)});
+      const buttons = ${JSON.stringify(format.buttons)}.map(id => document.getElementById(id));
+      return { open: details.open, buttonsVisible: buttons.every(button => button.checkVisibility() && !button.disabled),
+        fitsViewport: buttons.every(button => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= -2 && rect.right <= innerWidth + 2;
+        }) };
+    })()`);
+    check(format.card + ' exposes existing download buttons', expanded.open && expanded.buttonsVisible && expanded.fitsViewport, expanded);
+    const reached = [];
+    for (const id of format.buttons) {
+      await pressKey('Tab', 'Tab', 9);
+      reached.push(await evaluate('document.activeElement.id'));
+    }
+    check(format.card + ' download choices are keyboard reachable',
+      reached.every((id, index) => id === format.buttons[index]), { expected: format.buttons, reached });
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).querySelector('summary').focus()`);
+    await pressKey(' ', 'Space', 32);
+    const hiddenAgain = await evaluate(`!document.querySelector(${JSON.stringify(selector)}).open &&
+      ${JSON.stringify(format.buttons)}.every(id => !document.getElementById(id).checkVisibility())`);
+    check(format.card + ' hides download choices again with Space', hiddenAgain);
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).open = false`);
+  }
+}
+
+async function auditProfileValidation({ evaluate, width, report }) {
+  const result = await evaluate(`(() => {
+    goToStep(activeSteps().findIndex(step => step.id === 'consultant'), true);
+    const details = document.getElementById('profileSettings');
+    const field = document.getElementById('c_uniqueId');
+    if (!details || !field) return { passed: false, missingSettings: true };
+    const savedId = S.consultant.uniqueId;
+    const wasOpen = details.open;
+    let openedBeforeFocus = false;
+    const onFocus = () => { openedBeforeFocus = details.open && field.checkVisibility(); };
+    field.addEventListener('focus', onFocus);
+    try {
+      details.open = false;
+      document.getElementById('c_name').focus();
+      S.consultant.uniqueId = '';
+      mirror('consultant.uniqueId');
+      const initiallyHidden = !field.checkVisibility();
+      const blocked = !canLeave('consultant');
+      const focused = document.activeElement === field;
+      const warningVisible = document.getElementById('profileGate').checkVisibility();
+      return { initiallyHidden, blocked, openedBeforeFocus, focused, warningVisible,
+        passed: initiallyHidden && blocked && openedBeforeFocus && focused && warningVisible };
+    } finally {
+      field.removeEventListener('focus', onFocus);
+      S.consultant.uniqueId = savedId;
+      mirror('consultant.uniqueId');
+      paintProfileGate();
+      details.open = wasOpen;
+      document.getElementById('toast').className = 'toast';
+    }
+  })()`);
+  const test = 'Missing Unique ID opens settings before focusing its field';
+  report.interactions.push({ width, role: 'admin', test, ...result });
+  console.log(JSON.stringify({ width, role: 'admin', test, passed: result.passed }));
+}
+
+async function auditReturnedEditor({ evaluate, width, report }) {
+  const result = await evaluate(`(() => {
+    const originalPanel = document.querySelector('.panel.active');
+    const source = document.getElementById('p-invoice');
+    const heading = source.querySelector('.panel-heading');
+    const fields = [...source.querySelectorAll('[data-bind]')];
+    const note = source.querySelector('[data-bind="invoice.note"]');
+    if (!heading || !fields.length || !note) return { passed: false, missingInvoiceEditor: true };
+    const savedNote = S.invoice.note;
+    const temporaryPanel = document.createElement('section');
+    temporaryPanel.className = 'panel active';
+    const temporaryHeading = document.createElement('h2');
+    temporaryHeading.textContent = 'Returned invoice audit';
+    const host = document.createElement('div');
+    host.className = 'edithost';
+    host.hidden = true;
+    temporaryPanel.append(temporaryHeading, host);
+    originalPanel.classList.remove('active');
+    document.getElementById('main-content').appendChild(temporaryPanel);
+    let restore = null;
+    try {
+      restore = borrowDocument('invoice', host);
+      const movedSameFields = fields.every(field => host.contains(field) && !source.contains(field));
+      const singleHeading = document.querySelectorAll('.panel.active h2').length === 1 &&
+        source.contains(heading) && !host.querySelector('.panel-heading');
+      const visibleEditor = note.checkVisibility();
+      note.value = 'Synthetic returned invoice edit';
+      note.dispatchEvent(new Event('input', { bubbles: true }));
+      const bindingWhileBorrowed = S.invoice.note === note.value;
+      restore();
+      restore = null;
+      const restoredSameFields = host.hidden && !host.querySelector('[data-bind]') &&
+        fields.every(field => source.contains(field));
+      note.value = 'Synthetic restored invoice edit';
+      note.dispatchEvent(new Event('input', { bubbles: true }));
+      const bindingAfterRestore = S.invoice.note === note.value;
+      return { movedSameFields, singleHeading, visibleEditor, bindingWhileBorrowed, restoredSameFields, bindingAfterRestore,
+        passed: movedSameFields && singleHeading && visibleEditor && bindingWhileBorrowed && restoredSameFields && bindingAfterRestore };
+    } finally {
+      if (restore) restore();
+      S.invoice.note = savedNote;
+      mirror('invoice.note');
+      persist();
+      temporaryPanel.remove();
+      originalPanel.classList.add('active');
+    }
+  })()`);
+  const test = 'Returned invoice editor moves and restores live fields without a duplicate heading';
+  report.interactions.push({ width, role: 'admin', test, ...result });
+  console.log(JSON.stringify({ width, role: 'admin', test, passed: result.passed }));
+}
+
 async function main() {
   const mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
   const server = http.createServer((req, res) => {
@@ -515,8 +731,11 @@ async function main() {
           report.screens.push({ role, panel, width, screenshot: filename, ...result });
           console.log(JSON.stringify({ role, panel, width, documentWidth: result.documentWidth,
             unnamed: result.unnamedButtons.length, unlabeled: result.unlabeledFields.length, tiny: result.tinyControls.length }));
+          await auditDisclosures({ evaluate, pressKey, width, role, panel, report });
         }
         if (role === 'admin') {
+          await auditProfileValidation({ evaluate, width, report });
+          await auditReturnedEditor({ evaluate, width, report });
           const focusResult = await evaluate(`(() => {
             const trigger = document.getElementById('btnProfiles');
             trigger.focus();

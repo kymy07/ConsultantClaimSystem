@@ -723,6 +723,12 @@ changes the selected day's entry. Document previews return focus to the original
 closed. On phones, records stack into cards and editable documents scroll inside their own
 area while retaining the original PDF, Excel and Word layouts.
 
+Profile fields are grouped into personal details, payment and signature sections. Account
+and claim numbering settings expand separately. Optional instructions open from labelled
+**?** controls, and the **Review** step keeps document previews visible with download formats
+under **Download a copy**. These disclosures work with touch, Enter and Space; required-field
+validation opens a collapsed setting before focusing it. Balances and warnings stay visible.
+
 ---
 
 ## Editing Guide

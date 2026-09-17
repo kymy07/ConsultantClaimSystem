@@ -219,15 +219,13 @@ async function renderApprovals () {
   if (head) head.textContent = prepares ? 'Status' : 'Approvals';
   if (lead) {
     lead.textContent = prepares
-      ? 'Track your time sheets and invoices by month. Open a document to see its details.'
-      : 'Choose a month, review the documents waiting on you, and track their approval progress.';
+      ? 'Track monthly submissions. Open a document for details.'
+      : 'Choose a month and review documents awaiting your approval.';
   }
 
   if (!Sync.on) {
     host.innerHTML = Sync.offlineNote(
-      'Approvals travel between five people on five machines, so they need the ' +
-      'shared database — which this browser cannot reach right now. Nothing has ' +
-      'been lost: the form is still saved here.');
+      'Cannot connect to approvals. Your draft is saved on this device.');
     return;
   }
 
@@ -429,7 +427,7 @@ function statusTable () {
     const cell = document.createElement('td');
     cell.colSpan = 8;
     cell.className = 'statusempty';
-    cell.textContent = 'No profiles to show yet. Save a consultant profile to start tracking documents.';
+    cell.textContent = 'No profiles yet. Save a consultant profile to begin.';
     tr.appendChild(cell);
     tbody.appendChild(tr);
   }
@@ -584,7 +582,7 @@ function statusRow (name, kind, sub, first) {
         typeof archiveHas === 'function' &&
         !archiveHas(name, statusMonth.y, statusMonth.m, 'invoice')) {
       const put = button('File it', 'ghost small', () => fileInvoiceNow(sub, put));
-      put.title = 'Put the approved invoice on file, so the month has its copy';
+      put.title = 'File the approved invoice for this month';
       acts.appendChild(put);
     }
     if (sub.status === 'returned' && (sub.created_by === myEmail() || Auth.isAdmin())) {
@@ -794,14 +792,14 @@ function decideBox (sub) {
   head.className = 'decidehead';
   head.id = 'approvalDecisionHeading';
   head.textContent =
-    decideAction === 'return' ? 'Send this document back — say what needs fixing'
-    : decideAction === 'resubmit' ? 'Send this document back for approval'
+    decideAction === 'return' ? 'Return for changes'
+    : decideAction === 'resubmit' ? 'Resubmit for approval'
     : signs ? 'Sign and approve'
-    : signing ? `Sign the ${kindLabel(kindOf(sub)).toLowerCase()} and pass it on`
+    : signing ? `Sign and approve the ${kindLabel(kindOf(sub)).toLowerCase()}`
     : kindOf(sub) !== 'claim' && sub.status !== 'pending_signature'
-      ? 'Approve the invoice — there is nothing on it for an approver to sign'
+      ? 'Approve invoice · no signature required'
     : sub.status === 'pending_signature'
-      ? 'Close the invoice — there is no signature to place on one'
+      ? 'Close invoice · no signature required'
       : `Approve the ${kindLabel(kindOf(sub)).toLowerCase()}`;
   box.appendChild(head);
   const context = document.createElement('p');
@@ -834,8 +832,8 @@ function decideBox (sub) {
     drop.className = 'decidefile' + (signs ? '' : ' required');
     const cap = document.createElement('span');
     cap.textContent = signs
-      ? `Or, if it was signed on paper, upload the ${stage.filed} document:`
-      : `Upload the ${kindLabel(kindOf(sub)).toLowerCase()} you have signed:`;
+      ? `Or upload the ${stage.filed} document:`
+      : `Upload the signed ${kindLabel(kindOf(sub)).toLowerCase()}:`;
     drop.appendChild(cap);
     const inp = document.createElement('input');
     inp.type = 'file';
@@ -844,9 +842,8 @@ function decideBox (sub) {
     drop.appendChild(inp);
     const why = document.createElement('small');
     why.textContent = signs
-      ? 'Draw above or upload a signed copy. PDF or image, up to 12 MB. Uploaded copies are kept on file.'
-      : `An ${kindLabel(kindOf(sub)).toLowerCase()} has no box for an approver to sign, so the ` +
-        'signed file is the only thing there is to put your name to.';
+      ? 'Sign above or upload a PDF or image, up to 12 MB. Uploaded copies are kept on file.'
+      : 'A signed copy is required. PDF or image, up to 12 MB.';
     drop.appendChild(why);
     box.appendChild(drop);
     filed = inp;

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#223140">
 <meta name="description" content="Prepare your monthly claim and invoice, follow approvals, and collect signed documents with Geospatial AI.">
 <title>Consultant Claim System</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20260918c">
+<link rel="stylesheet" href="assets/css/style.css?v=20260919a">
 </head>
 <body class="locked">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -30,7 +30,7 @@
      which would put the password in the URL and in the server log. -->
   <form class="auth-card" id="authForm" autocomplete="on" onsubmit="return false">
     <div class="auth-heading"><p class="auth-eyebrow">Consultant Claim System</p><h1>Welcome back</h1></div>
-    <p class="auth-lead">Sign in with your <b>BDOS</b> account to open your workspace.</p>
+    <p class="auth-lead">Sign in with your <b>BDOS</b> account.</p>
 
     <label>Email
       <input type="email" id="authEmail" name="email" autocomplete="username"
@@ -44,7 +44,10 @@
     <p class="auth-error" id="authError" role="alert" hidden></p>
     <button type="submit" class="btn primary auth-submit" id="authSubmit">Sign in</button>
 
-    <p class="auth-note"><b>Need help signing in?</b><br>Use your authorised BDOS account. Contact your BDOS administrator if you need access or a password reset.</p>
+    <details class="help-disclosure auth-note">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Sign-in help</span></summary>
+      <div class="help-content"><p>Use your authorised BDOS account. Contact your BDOS administrator for access or a password reset.</p></div>
+    </details>
   </form>
   </div>
 </div>
@@ -55,7 +58,7 @@
     <span class="brand-rule"></span>
     <div class="brand-text">
       <h1>Consultant Claim System</h1>
-      <p>Prepare documents. Track approvals. Find signed copies.</p>
+      <p>Claims &amp; approvals</p>
     </div>
   </div>
   <div class="topbar-actions">
@@ -79,31 +82,66 @@
 
 <!-- ============ STEP 1: DETAILS ============ -->
 <section class="panel active" id="p-consultant" data-step="consultant">
-  <h2>Your profile</h2>
-  <p class="lead">Choose your profile, check your details, then save any changes before continuing. Your saved details fill in the claim and invoice automatically.</p>
+  <div class="panel-heading">
+    <div><h2>Your profile</h2><p class="lead">Select a profile to get started.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Profile help</span></summary>
+      <div class="help-content"><p>Your saved details fill in your claim and invoice. Check each section and save any changes before continuing.</p></div>
+    </details>
+  </div>
 
   <!-- a card each, with the year's leave on it, so the balance is visible
        before anybody opens anything -->
   <div class="profilecards" id="profileCards"></div>
 
   <div id="detailsBox" hidden>
-    <h3 id="detailsHead">Personal details <span class="hint">Save your changes before continuing.</span></h3>
+    <div class="profile-layout">
+    <section class="form-section form-section-wide" aria-labelledby="detailsHead">
+    <div class="section-heading"><h3 id="detailsHead">Personal details</h3></div>
     <div class="grid2">
-    <label>Full Name <span class="req">required</span><input id="c_name" aria-required="true" data-bind="consultant.name" placeholder="e.g. Ahmad bin Abdullah"></label>
+    <label><span class="field-label">Full name <span class="req">required</span></span><input id="c_name" aria-required="true" data-bind="consultant.name" placeholder="e.g. Ahmad bin Abdullah"></label>
     <label>IC No.<input data-bind="consultant.ic" placeholder="e.g. 010203-04-0567"></label>
-    <label>Address (Line 1) <span class="hint">(runs on to line 2)</span><input data-bind="consultant.addr1" placeholder="e.g. No 12, Jalan Contoh 1,"></label>
-    <label>Address (Line 2)<input data-bind="consultant.addr2" placeholder="e.g. Taman Contoh, 40000 Shah Alam, Selangor"></label>
-    <label>Position <span class="hint">(as on the invoice)</span><input data-bind="consultant.position" placeholder="Full Stack Developer"></label>
-    <label>Position <span class="hint">(as on the Claim form)</span><input data-bind="consultant.position2" placeholder="FULL STACK DEVELOPER (CONSULTANT)"></label>
-    <label>Work Location<input data-bind="consultant.workLoc" placeholder="UZMA TOWER"></label>
+    <label>Address line 1<input data-bind="consultant.addr1" placeholder="e.g. No 12, Jalan Contoh 1,"></label>
+    <label>Address line 2<input data-bind="consultant.addr2" placeholder="e.g. Taman Contoh, 40000 Shah Alam, Selangor"></label>
+    <label>Position on invoice<input data-bind="consultant.position" placeholder="Full Stack Developer"></label>
+    <label>Position on claim form<input data-bind="consultant.position2" placeholder="FULL STACK DEVELOPER (CONSULTANT)"></label>
+    <label>Work location<input data-bind="consultant.workLoc" placeholder="UZMA TOWER"></label>
   </div>
+    </section>
+
+    <section class="form-section" aria-labelledby="paymentDetailsHead">
+    <div class="section-heading"><h3 id="paymentDetailsHead">Payment details</h3></div>
+    <div class="grid2">
+      <label>Bank name<input data-bind="consultant.bank" placeholder="RHB BANK Berhad"></label>
+      <label>Account name<input data-bind="consultant.accName" placeholder="Name on your bank account"></label>
+      <label>Account No.<input data-bind="consultant.accNo" placeholder="e.g. 1-23456-0001234-5"></label>
+      <label><span class="field-label">Monthly rate (RM) <span class="req">required</span></span>
+        <input type="number" id="c_rate" aria-required="true" data-bind="invoice.monthlyRate" data-type="num"
+               step="0.01" min="0" placeholder="e.g. 3500.00"></label>
+    </div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Payment help</span></summary>
+      <div class="help-content"><p>Bank details appear on your invoice. Enter your agreed monthly rate; the invoice amount is calculated from your claim.</p></div>
+    </details>
+    </section>
+
+    <section class="form-section" aria-labelledby="profileSignatureHead">
+    <div class="section-heading"><h3 id="profileSignatureHead">Signature <span class="req">required</span></h3></div>
+    <p class="hint">Draw or upload your signature.</p>
+    <div class="sigprofile" id="sigProfile"></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Signature help</span></summary>
+      <div class="help-content"><p>Upload a PDF, PNG or JPG, select the signature and confirm the preview. Your saved signature appears on your claim and invoice.</p></div>
+    </details>
+    </section>
 
   <!-- Three things that belong to the office rather than to the person: the
        number series, the count, and which sign-in this profile is. One
        consultant deciding they are 07 is how two people both end up 07. -->
-  <h3>Account &amp; claim numbering <span class="hint">Managed by your administrator</span></h3>
+  <details class="settings-disclosure form-section-wide" id="profileSettings">
+  <summary>Account &amp; claim numbering <span class="hint">Administrator settings</span></summary>
   <div class="grid3" id="adminFields">
-    <label class="keyfield">Unique ID <span class="req">required</span>
+    <label class="keyfield"><span class="field-label">Unique ID <span class="req">required</span></span>
       <span class="hint">Your identifier in each invoice number.</span>
       <input data-bind="consultant.uniqueId" id="c_uniqueId" aria-required="true" placeholder="01" maxlength="4" inputmode="numeric"></label>
     <label class="keyfield">Next claim number
@@ -115,29 +153,8 @@
   </div>
   <p class="keynote" id="invNoPreview"></p>
   <p class="keynote" id="adminLocked" hidden></p>
-
-    <h3>Bank Details <span class="hint">(printed on the Invoice)</span></h3>
-    <div class="grid2">
-      <label>Bank Name<input data-bind="consultant.bank" placeholder="RHB BANK Berhad"></label>
-      <label>Account Name<input data-bind="consultant.accName" placeholder="name as it appears on the account"></label>
-      <label>Account No.<input data-bind="consultant.accNo" placeholder="e.g. 1-23456-0001234-5"></label>
+  </details>
     </div>
-
-    <h3>Monthly rate <span class="hint">Used to calculate your invoice</span></h3>
-    <div class="grid2">
-      <label>Monthly Rate (RM) <span class="req">required</span>
-        <span class="hint">Enter your agreed monthly rate before continuing.</span>
-        <input type="number" id="c_rate" aria-required="true" data-bind="invoice.monthlyRate" data-type="num"
-               step="0.01" min="0" placeholder="e.g. 3500.00"></label>
-    </div>
-
-    <!-- Everybody signs their own claim, so everybody keeps their signature
-         here rather than redrawing it on the form every month. -->
-    <h3>Signature <span class="req">required</span></h3>
-    <p class="hint">Draw it once, or upload a scan &mdash; PDF, PNG or JPG. Whatever you upload is
-      shown back to you to confirm before it is kept, and from then on it prints itself into the
-      PERSONNEL box on the Claim form and onto the Invoice.</p>
-    <div class="sigprofile" id="sigProfile"></div>
 
     <div class="leavebox" id="leaveBoxProfile"></div>
 
@@ -157,27 +174,27 @@
 <!-- ============ STEP 2: CHOOSE ============ -->
 <section class="panel" id="p-choose" data-step="choose">
   <h2>Choose your documents</h2>
-  <p class="lead">Choose the documents you need for this month. You can review and download them before submitting for approval.</p>
+  <p class="lead">Select what you need for this month.</p>
 
   <div class="choices" id="choices">
     <button type="button" class="choice" data-mode="claim">
       <span class="choice-tag">A</span>
       <h3>Claim Form</h3>
-      <p>Record your working days and leave on the Uzma Personnel Time Sheet.</p>
+      <p>Working days and leave.</p>
       <span class="choice-out">PDF + Word</span>
     </button>
 
     <button type="button" class="choice" data-mode="invoice">
       <span class="choice-tag">B</span>
-      <h3>Invoice Timesheet</h3>
-      <p>Prepare your monthly invoice with payment details and the amount due.</p>
+      <h3>Invoice</h3>
+      <p>Monthly fees and payment details.</p>
       <span class="choice-out">PDF + Excel</span>
     </button>
 
     <button type="button" class="choice" data-mode="both">
       <span class="choice-tag">A + B</span>
       <h3>Both documents</h3>
-      <p>Prepare the claim form and invoice together for your monthly submission.</p>
+      <p>Claim form and invoice together.</p>
       <span class="choice-out">PDF + Word + Excel</span>
     </button>
   </div>
@@ -185,10 +202,15 @@
 
 <!-- ============ STEP 3: INVOICE (document replica) ============ -->
 <section class="panel" id="p-invoice" data-step="invoice">
-  <h2>Invoice</h2>
-  <p class="lead">Check your billing period, payment details and amount. Edit the fields directly, then preview your invoice before downloading.</p>
+  <div class="panel-heading">
+    <div><h2>Invoice</h2><p class="lead">Check your billing period and amount.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Invoice help</span></summary>
+      <div class="help-content"><p>Edit fields directly on the invoice. Your saved profile supplies your personal and bank details. Preview the PDF in the next step before submitting.</p></div>
+    </details>
+  </div>
 
-  <p class="scroll-hint" id="invoiceScrollHint">Scroll horizontally to see the full invoice. Your downloaded document keeps its original layout.</p>
+  <p class="scroll-hint" id="invoiceScrollHint">Scroll sideways to view the full invoice.</p>
   <div class="sheetwrap" tabindex="0" role="region" aria-label="Editable invoice" aria-describedby="invoiceScrollHint">
   <div class="doc doc-invoice">
 
@@ -271,10 +293,21 @@
 
 <!-- ============ STEP 4: CLAIM (document replica) ============ -->
 <section class="panel" id="p-claim" data-step="claim">
-  <h2>Claim Form</h2>
-  <p class="lead">Check the month, confirm your working days and leave, then review the personnel and project details.</p>
+  <div class="panel-heading">
+    <div><h2>Claim form</h2><p class="lead">Check the month, working days and leave.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Timesheet guide</span></summary>
+      <div class="help-content">
+        <p>Select a day to cycle through its entries. Weekends fill automatically; <b>Fill working days</b> also marks Selangor public holidays.</p>
+        <ul><li><b>/</b> Worked &middot; <b>PH</b> Public holiday</li><li><b>PTO</b> Paid time off &middot; <b>MC</b> Medical leave</li><li><b>UL</b> Unpaid leave &middot; <b>-</b> not a working day</li></ul>
+        <p>Use arrow keys to move between days, then Enter or Space to change an entry. Total days [A] includes paid days; unpaid leave and unmarked weekdays are excluded.</p>
+        <p>PTO and MC are paid up to your yearly allowance. Leave balances include submitted months; UL has no allowance limit.</p>
+        <p>Check the pre-filled approver names and dates in section C. Update them if someone else signs this month.</p>
+      </div>
+    </details>
+  </div>
 
-  <p class="scroll-hint" id="claimScrollHint">Scroll horizontally to see the full form. Your downloaded document keeps its original layout.</p>
+  <p class="scroll-hint" id="claimScrollHint">Scroll sideways to view the full form.</p>
   <div class="sheetwrap" tabindex="0" role="region" aria-label="Editable claim form" aria-describedby="claimScrollHint">
   <div class="doc doc-claim">
 
@@ -322,19 +355,18 @@
     </div>
 
     <div class="uz-blabel">(B)</div>
-    <p class="uz-tip" id="timesheetHelp">Select a day to change its entry: <b>blank &rarr; / worked &rarr; PH public holiday &rarr; PTO paid time off &rarr; MC medical leave &rarr; UL unpaid leave &rarr; - not a working day</b>. Use arrow keys to move between days and Enter or Space to change an entry. Weekends fill automatically. Total days [A] includes paid days; unpaid leave and unmarked weekdays are excluded.</p>
+    <p class="uz-tip" id="timesheetHelp">Select a day to change its entry. <b>/</b> Worked &middot; <b>PH</b> Holiday &middot; <b>PTO</b> Paid leave &middot; <b>MC</b> Medical leave &middot; <b>UL</b> Unpaid leave &middot; <b>-</b> Not working.</p>
     <div class="uz-gridwrap" id="activities"></div>
     <div class="doc-underbar">
       <button class="btn ghost small" id="btnAddActivity">+ Add activity row</button>
-      <button class="btn ghost small" id="btnFillDays" title="Tick every working day and mark the Selangor public holidays">Fill the month in</button>
-      <button class="btn ghost small" id="btnResetDays">Clear all ticks</button>
+      <button class="btn ghost small" id="btnFillDays" title="Tick every working day and mark the Selangor public holidays">Fill working days</button>
+      <button class="btn ghost small" id="btnResetDays">Clear entries</button>
     </div>
     <div class="summary" id="tsSummary"></div>
     <p class="holidays" id="tsHolidays" hidden></p>
     <p class="warn" id="tsWarn" hidden></p>
     <div class="leavebox" id="leaveBox"></div>
 
-    <p class="uz-tip mt">Names and dates are pre-filled with the usual approvers &mdash; type over any of them if somebody else signs this month.</p>
     <table class="uz-sign">
       <thead>
         <!-- On the form the box starts at PREPARED BY: the label column is
@@ -385,26 +417,31 @@
 
 <!-- ============ STEP 5: GENERATE ============ -->
 <section class="panel" id="p-generate" data-step="generate">
-  <h2>Generate Documents</h2>
+  <h2>Review &amp; download</h2>
+  <p class="lead">Preview your documents before continuing to submission.</p>
 
   <div class="gencards">
     <div class="gencard" id="card_claim">
-      <h3>A &mdash; Claim / Personnel Time Sheet</h3>
+      <h3>Claim form</h3>
       <p id="gsum_claim" class="gsum"></p>
       <div class="btnrow">
-        <button class="btn ghost" id="btnClaimPreview">View PDF</button>
-        <button class="btn" id="btnClaimPdf">Download PDF</button>
-        <button class="btn" id="btnClaimDocx">Download Word</button>
+        <button class="btn" id="btnClaimPreview">Preview PDF</button>
       </div>
+      <details class="download-options">
+        <summary>Download a copy</summary>
+        <div class="btnrow"><button class="btn ghost" id="btnClaimPdf">PDF</button><button class="btn ghost" id="btnClaimDocx">Word</button></div>
+      </details>
     </div>
     <div class="gencard" id="card_inv">
-      <h3>B &mdash; Invoice Timesheet</h3>
+      <h3>Invoice</h3>
       <p id="gsum_inv" class="gsum"></p>
       <div class="btnrow">
-        <button class="btn ghost" id="btnInvPreview">View PDF</button>
-        <button class="btn" id="btnInvPdf">Download PDF</button>
-        <button class="btn" id="btnInvXlsx">Download Excel</button>
+        <button class="btn" id="btnInvPreview">Preview PDF</button>
       </div>
+      <details class="download-options">
+        <summary>Download a copy</summary>
+        <div class="btnrow"><button class="btn ghost" id="btnInvPdf">PDF</button><button class="btn ghost" id="btnInvXlsx">Excel</button></div>
+      </details>
     </div>
   </div>
 
@@ -413,8 +450,13 @@
 
 <!-- ============ STEP 6: SUBMIT ============ -->
 <section class="panel" id="p-submit" data-step="submit">
-  <h2>Send it for approval</h2>
-  <p class="lead">Review the details below and choose which documents to send. Each goes to the project manager, then the HOD. Claim forms also go to the PA for the HOD&rsquo;s signature. Track each document in Status.</p>
+  <div class="panel-heading">
+    <div><h2>Submit for approval</h2><p class="lead">Confirm the documents and details below.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Approval steps</span></summary>
+      <div class="help-content"><ol><li>The project manager reviews each document.</li><li>The HOD approves it.</li><li>Claim forms go to the PA for the HOD&rsquo;s signature.</li></ol><p>Follow progress in <b>Status</b>. Each document is tracked separately.</p></div>
+    </details>
+  </div>
 
   <div class="submitcard" id="card_submit">
     <!-- Two documents, two approvals. Send one, or both — a time sheet that
@@ -427,7 +469,7 @@
 
     <div class="submitfacts" id="submitFacts"></div>
     <p class="submitwarn" id="submitWarn" role="status" aria-live="polite" hidden></p>
-    <label class="submitnote">Anything the project manager should know <span class="hint">(optional)</span>
+    <label class="submitnote"><span class="field-label">Note to reviewer <span class="hint">(optional)</span></span>
       <textarea class="decidenote" id="submitNote" rows="3"
                 placeholder="e.g. two days of the period were spent at the client site"></textarea>
     </label>
@@ -435,14 +477,14 @@
   </div>
 
   <p class="emptynote" id="submitOffline" hidden>
-    <b>Connect to submit your claim.</b> The shared service is currently unavailable. You can continue editing and downloading documents. Check your connection and try again.
+    <b>Unable to submit right now.</b> Check your connection and try again. You can still edit and download documents.
   </p>
 </section>
 
 <!-- ============ RE-SUBMIT — only while something has come back ============ -->
 <section class="panel" id="p-resubmit" data-step="resubmit">
   <h2>Returned documents</h2>
-  <p class="lead">Read the reviewer&rsquo;s feedback, update the returned document, then submit it again. It will restart the approval process.</p>
+  <p class="lead">Follow the feedback, update your document and resubmit for approval.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshReturned">Refresh</button>
   </div>
@@ -452,7 +494,7 @@
 <!-- ============ STEP 7: STATUS / APPROVALS ============ -->
 <section class="panel" id="p-approvals" data-step="approvals">
   <h2 id="approvalHead">Status</h2>
-  <p class="lead" id="approvalLead">Where every claim has got to, and what is waiting on you.</p>
+  <p class="lead" id="approvalLead">Track progress and review pending documents.</p>
   <!-- The month and the status counts are built
        by approvals.js — they are part of the table rather than a toolbar
        above it. Refresh reloads both the approvals and the signed copies. -->
@@ -463,15 +505,17 @@
 
   <!-- The signed paper, once it exists. Everything above is the form as
        software holds it; this is what was actually signed. -->
+  <div class="secondary-section">
   <h3 class="archivehead" id="archiveHead">Signed copies on file</h3>
-  <p class="lead">Find signed documents by person and month. If your role allows uploads, you can file a signed copy here.</p>
+  <p class="lead">Find signed documents by person and month.</p>
   <div id="archiveList" class="archive"></div>
+  </div>
 </section>
 
 <!-- ============ STEP 8: HISTORY (administrator only) ============ -->
 <section class="panel" id="p-history" data-step="history">
   <h2 id="historyHead">History</h2>
-  <p class="lead" id="historyLead">Find filed documents by consultant and year. Preview a copy or download the selected records in one ZIP file.</p>
+  <p class="lead" id="historyLead">Find filed documents by consultant and year.</p>
   <div class="archivebar">
     <button class="btn ghost" id="btnRefreshHistory">Refresh</button>
     <label class="archivefilter">Consultant
@@ -488,11 +532,13 @@
 
 <!-- ============ THE PA: DOWNLOAD, THEN UPLOAD ============ -->
 <section class="panel" id="p-mysign" data-step="mysign">
-  <h2>Your signature</h2>
-  <p class="lead">This goes in the <b>Prepared by</b> box of every payment advice you write, so it
-    is put here once rather than drawn again on each one. Draw it, or upload a scan of it &mdash;
-    the same control the consultants use on their own forms. It is kept in this browser and sent
-    nowhere until it is printed on a form you prepare.</p>
+  <div class="panel-heading">
+    <div><h2>Your signature</h2><p class="lead">Save your signature for payment advice.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Signature help</span></summary>
+      <div class="help-content"><p>Draw or upload your signature once. It appears in the <b>Prepared by</b> box of each payment advice. It stays in this browser until included in a document you prepare.</p></div>
+    </details>
+  </div>
   <div class="card">
     <div id="sigPa" class="sigprofile"></div>
   </div>
@@ -500,9 +546,7 @@
 
 <section class="panel" id="p-todownload" data-step="todownload">
   <h2>Download for signature</h2>
-  <p class="lead">Two documents a month go to the HOD to sign: the approved time sheet, and the
-    payment advice you wrote for it. Download them here and arrange his signature. Then open
-    <b>Re-Upload</b> to attach the signed copies and close the month.</p>
+  <p class="lead">Download the time sheet and payment advice for the HOD to sign. File the signed copies in <b>Re-Upload</b>.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshSignDownload">Refresh</button>
   </div>
@@ -510,13 +554,13 @@
 </section>
 
 <section class="panel" id="p-advice" data-step="advice">
-  <h2>Payment Advice</h2>
-  <p class="lead">Uzma&rsquo;s own form for paying a consultant&rsquo;s invoice. Everybody is listed
-    below; a row unlocks once the HOD has approved that person&rsquo;s invoice for the month. Open it, fill in the
-    office&rsquo;s own boxes, check it, and write it. Nobody approves it in here: the project
-    manager and the HOD have already approved the invoice it pays. Print it from <b>Download</b>,
-    have the HOD sign it, and file the signed copy on <b>Re-Upload</b>. The consultant never sees
-    this form.</p>
+  <div class="panel-heading">
+    <div><h2>Payment advice</h2><p class="lead">Prepare payment advice for invoices approved by the HOD.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Payment advice guide</span></summary>
+      <div class="help-content"><ol><li>Open an approved invoice&rsquo;s row and complete the payment details.</li><li>Preview and save the payment advice.</li><li>Print it from <b>Download</b> for the HOD to sign.</li><li>File the signed copy in <b>Re-Upload</b>.</li></ol><p>No further approval is needed in this app. Payment advice is not shown to consultants.</p></div>
+    </details>
+  </div>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshAdvice">Refresh</button>
   </div>
@@ -525,7 +569,7 @@
 
 <section class="panel" id="p-filed" data-step="filed">
   <h2>Filed claim forms</h2>
-  <p class="lead">Signed claim forms sent to Group People &amp; Finance, newest first. Each record includes the leave recorded on that month&rsquo;s form.</p>
+  <p class="lead">Signed claims sent to Group People &amp; Finance, with monthly leave records.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshFiled">Refresh</button>
   </div>
@@ -533,11 +577,14 @@
 </section>
 
 <section class="panel" id="p-toupload" data-step="toupload">
-  <h2>Re-upload the signed copies</h2>
-  <p class="lead">Two documents come back signed on paper: the time sheet and the payment advice.
-    Attach each one against its month and look at it before it goes. When everything is ready, use
-    <b>Submit</b> below to file the copies and close those months. Uploading a newer scan replaces
-    the filed copy.</p>
+  <div class="panel-heading">
+    <div><h2>Re-upload the signed copies</h2><p class="lead">Attach, preview and submit signed time sheets and payment advice.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Upload guide</span></summary>
+      <div class="help-content"><p>Match each copy to its person, month and document type. Check the preview, then select <b>Submit</b> to file the copies and close the months.</p></div>
+    </details>
+  </div>
+  <p class="hint">Uploading a new scan replaces the existing filed copy.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshSignUpload">Refresh</button>
   </div>
@@ -597,29 +644,29 @@
      fetches the page again but keeps the old JavaScript for up to ten minutes
      — which reads as "the fix did not work". Bump this stamp whenever
      anything under assets/ changes and a reload picks it all up at once. -->
-<script src="vendor/jspdf.umd.min.js?v=20260918c"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js?v=20260918c"></script>
-<script src="vendor/carlito.js?v=20260918c"></script>
-<script src="vendor/exceljs.min.js?v=20260918c"></script>
-<script src="vendor/FileSaver.min.js?v=20260918c"></script>
-<script src="vendor/signature_pad.umd.min.js?v=20260918c"></script>
-<script src="vendor/docx.umd.js?v=20260918c"></script>
-<script src="assets/js/state.js?v=20260918c"></script>
-<script src="assets/js/holidays.js?v=20260918c"></script>
-<script src="assets/js/logo.js?v=20260918c"></script>
-<script src="assets/js/timesheet.js?v=20260918c"></script>
-<script src="assets/js/signature.js?v=20260918c"></script>
-<script src="assets/js/gen-invoice.js?v=20260918c"></script>
-<script src="assets/js/gen-claim.js?v=20260918c"></script>
-<script src="assets/js/gen-advice.js?v=20260918c"></script>
-<script src="assets/js/preview.js?v=20260918c"></script>
-<script src="assets/js/auth.js?v=20260918c"></script>
-<script src="assets/js/sync.js?v=20260918c"></script>
-<script src="assets/js/zip.js?v=20260918c"></script>
-<script src="assets/js/approvals.js?v=20260918c"></script>
-<script src="assets/js/archive.js?v=20260918c"></script>
-<script src="assets/js/resubmit.js?v=20260918c"></script>
-<script src="assets/js/signing.js?v=20260918c"></script>
-<script src="assets/js/app.js?v=20260918c"></script>
+<script src="vendor/jspdf.umd.min.js?v=20260919a"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js?v=20260919a"></script>
+<script src="vendor/carlito.js?v=20260919a"></script>
+<script src="vendor/exceljs.min.js?v=20260919a"></script>
+<script src="vendor/FileSaver.min.js?v=20260919a"></script>
+<script src="vendor/signature_pad.umd.min.js?v=20260919a"></script>
+<script src="vendor/docx.umd.js?v=20260919a"></script>
+<script src="assets/js/state.js?v=20260919a"></script>
+<script src="assets/js/holidays.js?v=20260919a"></script>
+<script src="assets/js/logo.js?v=20260919a"></script>
+<script src="assets/js/timesheet.js?v=20260919a"></script>
+<script src="assets/js/signature.js?v=20260919a"></script>
+<script src="assets/js/gen-invoice.js?v=20260919a"></script>
+<script src="assets/js/gen-claim.js?v=20260919a"></script>
+<script src="assets/js/gen-advice.js?v=20260919a"></script>
+<script src="assets/js/preview.js?v=20260919a"></script>
+<script src="assets/js/auth.js?v=20260919a"></script>
+<script src="assets/js/sync.js?v=20260919a"></script>
+<script src="assets/js/zip.js?v=20260919a"></script>
+<script src="assets/js/approvals.js?v=20260919a"></script>
+<script src="assets/js/archive.js?v=20260919a"></script>
+<script src="assets/js/resubmit.js?v=20260919a"></script>
+<script src="assets/js/signing.js?v=20260919a"></script>
+<script src="assets/js/app.js?v=20260919a"></script>
 </body>
 </html>
