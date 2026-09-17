@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#223140">
 <meta name="description" content="Prepare your monthly claim and invoice, follow approvals, and collect signed documents with Geospatial AI.">
 <title>Consultant Claim System</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20260917i">
+<link rel="stylesheet" href="assets/css/style.css?v=20260917j">
 </head>
 <body class="locked">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -500,8 +500,9 @@
   <h2>Payment Advice</h2>
   <p class="lead">Uzma&rsquo;s own form for paying a consultant&rsquo;s invoice. Everybody is listed
     below; a row unlocks once that person has sent their invoice for the month. Open it, fill in the
-    office&rsquo;s own boxes, and send it round the way a time sheet goes &mdash; the project manager,
-    the HOD, then back here to be signed. The consultant never sees this form.</p>
+    office&rsquo;s own boxes, check it, and send it round the way a time sheet goes &mdash; the
+    project manager, then the HOD. It comes back approved: print it, have the HOD sign it, and file
+    the signed copy on the <b>Upload</b> step. The consultant never sees this form.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshAdvice">Refresh</button>
   </div>
@@ -518,8 +519,11 @@
 </section>
 
 <section class="panel" id="p-toupload" data-step="toupload">
-  <h2>Upload the signed copy</h2>
-  <p class="lead">Attach each signed claim form and preview it. When everything is ready, use <b>Submit</b> below to send the copies to Group People &amp; Finance. Uploading a newer scan replaces the filed copy.</p>
+  <h2>Upload the signed copies</h2>
+  <p class="lead">Two documents come back signed on paper: the time sheet and the payment advice.
+    Attach each one against its month and look at it before it goes. When everything is ready, use
+    <b>Submit</b> below to file the copies and close those months. Uploading a newer scan replaces
+    the filed copy.</p>
   <div class="btnrow">
     <button class="btn ghost small" id="btnRefreshSignUpload">Refresh</button>
   </div>
@@ -579,29 +583,29 @@
      fetches the page again but keeps the old JavaScript for up to ten minutes
      — which reads as "the fix did not work". Bump this stamp whenever
      anything under assets/ changes and a reload picks it all up at once. -->
-<script src="vendor/jspdf.umd.min.js?v=20260917i"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js?v=20260917i"></script>
-<script src="vendor/carlito.js?v=20260917i"></script>
-<script src="vendor/exceljs.min.js?v=20260917i"></script>
-<script src="vendor/FileSaver.min.js?v=20260917i"></script>
-<script src="vendor/signature_pad.umd.min.js?v=20260917i"></script>
-<script src="vendor/docx.umd.js?v=20260917i"></script>
-<script src="assets/js/state.js?v=20260917i"></script>
-<script src="assets/js/holidays.js?v=20260917i"></script>
-<script src="assets/js/logo.js?v=20260917i"></script>
-<script src="assets/js/timesheet.js?v=20260917i"></script>
-<script src="assets/js/signature.js?v=20260917i"></script>
-<script src="assets/js/gen-invoice.js?v=20260917i"></script>
-<script src="assets/js/gen-claim.js?v=20260917i"></script>
-<script src="assets/js/gen-advice.js?v=20260917i"></script>
-<script src="assets/js/preview.js?v=20260917i"></script>
-<script src="assets/js/auth.js?v=20260917i"></script>
-<script src="assets/js/sync.js?v=20260917i"></script>
-<script src="assets/js/zip.js?v=20260917i"></script>
-<script src="assets/js/approvals.js?v=20260917i"></script>
-<script src="assets/js/archive.js?v=20260917i"></script>
-<script src="assets/js/resubmit.js?v=20260917i"></script>
-<script src="assets/js/signing.js?v=20260917i"></script>
-<script src="assets/js/app.js?v=20260917i"></script>
+<script src="vendor/jspdf.umd.min.js?v=20260917j"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js?v=20260917j"></script>
+<script src="vendor/carlito.js?v=20260917j"></script>
+<script src="vendor/exceljs.min.js?v=20260917j"></script>
+<script src="vendor/FileSaver.min.js?v=20260917j"></script>
+<script src="vendor/signature_pad.umd.min.js?v=20260917j"></script>
+<script src="vendor/docx.umd.js?v=20260917j"></script>
+<script src="assets/js/state.js?v=20260917j"></script>
+<script src="assets/js/holidays.js?v=20260917j"></script>
+<script src="assets/js/logo.js?v=20260917j"></script>
+<script src="assets/js/timesheet.js?v=20260917j"></script>
+<script src="assets/js/signature.js?v=20260917j"></script>
+<script src="assets/js/gen-invoice.js?v=20260917j"></script>
+<script src="assets/js/gen-claim.js?v=20260917j"></script>
+<script src="assets/js/gen-advice.js?v=20260917j"></script>
+<script src="assets/js/preview.js?v=20260917j"></script>
+<script src="assets/js/auth.js?v=20260917j"></script>
+<script src="assets/js/sync.js?v=20260917j"></script>
+<script src="assets/js/zip.js?v=20260917j"></script>
+<script src="assets/js/approvals.js?v=20260917j"></script>
+<script src="assets/js/archive.js?v=20260917j"></script>
+<script src="assets/js/resubmit.js?v=20260917j"></script>
+<script src="assets/js/signing.js?v=20260917j"></script>
+<script src="assets/js/app.js?v=20260917j"></script>
 </body>
 </html>

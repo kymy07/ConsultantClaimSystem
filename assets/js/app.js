@@ -102,16 +102,17 @@ const STEPS = [
   /* The whole record, for the two accounts whose job it is: the
      administrator, and whoever keeps the finished paper. */
   { id: 'history',    label: 'History', records: true, view: true },
-  /* The PA's two pages, and their only two: the time sheets waiting for the
-     HOD's signature, to print; and the same list with a box for the signed
-     scan, to file. The admin stands in everywhere, so the admin gets them
-     too — after everything else. */
+  /* The PA's three pages, in the order the job happens: print what is
+     waiting, write the payment advice for it, then file both back signed.
+     The admin stands in everywhere, so the admin gets them too — after
+     everything else.
+
+     Writing the advice and filing the signed copies are separate steps
+     because they are separate days: one is a form to fill in and check, the
+     other is a scan of that form once the HOD has put his name on it. */
   { id: 'todownload', label: 'Download', signs: true },
-  { id: 'toupload',   label: 'Upload',   signs: true },
-  /* The office's own form, prepared once the HOD has approved the bill it
-     pays. It goes round for approval like a time sheet and comes back to
-     be signed, so it is work rather than a place to look. */
   { id: 'advice',     label: 'Payment Advice', signs: true },
+  { id: 'toupload',   label: 'Upload',   signs: true },
   /* Not a step either: the job behind, rather than the job in front. */
   /* Called History for the PA, who has no other: it is where a confirmed
      month lives, under the person's name. The administrator already has a

@@ -34,6 +34,47 @@ function waitingSignature () {
     .sort(byMonthThenName);
 }
 
+/** the payment advices that have come back from the HOD to be filed */
+function waitingAdvice () {
+  return signingSubs
+    .filter(s => s.status === SIGNING_STATUS && kindOf(s) === 'advice')
+    .slice()
+    .sort(byMonthThenName);
+}
+
+/**
+ * One line per person and month, whichever of the two documents is waiting.
+ *
+ * The two do not arrive together: a time sheet comes back from the HOD while
+ * the advice for the same month is still being written, and the advice comes
+ * back after the sheet has been filed. A row is a month, not a document, so
+ * either one on its own is still a row and the other cell says why it is
+ * empty.
+ */
+function uploadRows () {
+  const rows = new Map();
+  const put = (item, key) => {
+    const who = String(item.consultant || '').trim();
+    const id = `${who}|${item.period_year}|${item.period_month}`;
+    if (!rows.has(id)) {
+      rows.set(id, {
+        consultant: who,
+        period_year: item.period_year,
+        period_month: item.period_month,
+        invoice_no: item.invoice_no || '',
+        claim: null,
+        advice: null
+      });
+    }
+    const row = rows.get(id);
+    row[key] = item;
+    if (!row.invoice_no) row.invoice_no = item.invoice_no || '';
+  };
+  waitingSignature().forEach(x => put(x, 'claim'));
+  waitingAdvice().forEach(x => put(x, 'advice'));
+  return [...rows.values()].sort(byMonthThenName);
+}
+
 function byMonthThenName (a, b) {
   return (b.period_year - a.period_year) || (b.period_month - a.period_month) ||
     String(a.consultant || '').localeCompare(String(b.consultant || ''));
@@ -390,45 +431,83 @@ async function renderSignUpload () {
   /* Only what is still waiting. A month that has gone to Group People &
      Finance is confirmed: it is not reopened from here, and it lives in
      History under that name and that month, one copy each. */
-  const waiting = waitingSignature();
+  const waiting = uploadRows();
 
   /* A scan is held in this browser until Submit sends it, so one put on a
      card that is no longer in the list has nowhere to go. */
-  const live = new Set(waiting.map(s => s.id));
+  const live = new Set();
+  waiting.forEach(r => {
+    if (r.claim) live.add(r.claim.id);
+    if (r.advice) live.add(r.advice.id);
+  });
   [...attached.keys()].forEach(id => { if (!live.has(id)) attached.delete(id); });
 
+  const count = waiting.reduce((n, r) => n + (r.claim ? 1 : 0) + (r.advice ? 1 : 0), 0);
   const h1 = document.createElement('h3');
-  h1.textContent = `Waiting for signed copies (${waiting.length})`;
+  h1.textContent = `Waiting for signed copies (${count})`;
   host.appendChild(h1);
 
-  if (!waiting.length) {
+  if (!count) {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
-    empty.textContent = 'Nothing is waiting. Every time sheet the HOD approved has been ' +
-      'signed and sent on.';
+    empty.textContent = 'Nothing is waiting. Every time sheet and payment advice the HOD ' +
+      'approved has been filed.';
     host.appendChild(empty);
   }
-  signingMonthTables(host, waiting, ['Status', 'Time sheet', 'Signed copy'],
-    sub => [statusBadge('Waiting for signature')].concat(uploadCells(sub)), {
+  signingMonthTables(host, waiting,
+    ['Status', 'Time sheet', 'Signed time sheet', 'Signed payment advice'],
+    row => [statusBadge(sheetStatusWords(row.consultant, row.period_year, row.period_month))]
+      .concat(uploadCells(row)), {
       roster: signingRoster(),
       fallbackMonth: currentSigningMonth(),
       missing: (name, month) =>
-        [statusBadge(sheetStatusWords(name, month.y, month.m)), emptyCell(), emptyCell()]
+        [statusBadge(sheetStatusWords(name, month.y, month.m)),
+         emptyCell(), emptyCell(), emptyCell()]
     });
-
 
   host.appendChild(submitBar());
 }
 
 /**
- * One time sheet waiting for its signed copy, as two cells of its row: the
- * sheet that was approved, and the signed copy put against it.
+ * One month's row: the time sheet that was approved, the signed scan put
+ * against it, and the signed payment advice put against that.
+ *
+ * Both scans work the same way and neither is sent until Submit, so the two
+ * pickers are the same picker told which document it is for.
  */
-function uploadCells (sub) {
-  const who = `${sub.consultant || 'consultant'}, ${periodOf(sub)}`;
-  const sheet = signingDocument('Time sheet', sub.invoice_no || '', [
-    labelledIcon('view', 'View', 'View the time sheet for ' + who, () => reviewSubmission(sub.id))
-  ]);
+function uploadCells (row) {
+  const who = `${row.consultant || 'consultant'}, ${periodOf(row)}`;
+
+  const sheet = row.claim
+    ? signingDocument('Time sheet', row.invoice_no || '', [
+        labelledIcon('view', 'View', 'View the time sheet for ' + who,
+                     () => reviewSubmission(row.claim.id))])
+    : signingDocument('Filed', 'Its signed copy is already on the record', []);
+
+  return [sheet, uploadSlot(row, 'claim'), uploadSlot(row, 'advice')];
+}
+
+/** why one of the two cells has no box in it yet */
+function uploadWaitingWords (row, kind) {
+  if (kind === 'claim') return 'The HOD has not approved this time sheet yet.';
+  const a = adviceFor(row);
+  if (!a) return 'Not written yet \u2014 write it on the Payment Advice step.';
+  if (a.status === 'complete') return 'Already filed.';
+  return 'With the approvers: ' +
+    ((typeof STATUS_TEXT === 'object' && STATUS_TEXT[a.status]) || a.status) + '.';
+}
+
+/**
+ * One box to put a signed scan in.
+ *
+ * Nothing is uploaded here. The file is held in this browser until Submit,
+ * because filing a copy and closing a month are one act and half of it is
+ * worse than neither.
+ */
+function uploadSlot (row, kind) {
+  const target = row[kind];
+  const who = `${row.consultant || 'consultant'}, ${periodOf(row)}`;
+  const what = kind === 'advice' ? 'payment advice' : 'time sheet';
 
   const cell = document.createElement('div');
   cell.className = 'signcell';
@@ -436,18 +515,28 @@ function uploadCells (sub) {
   /* What is already on file, if anything. Whoever is about to replace a copy
      should be able to look at the copy they are replacing. */
   const filed = typeof archiveFor === 'function'
-    ? archiveFor(sub.consultant, sub.period_year, Number(sub.period_month) - 1, 'claim') : null;
-  const file = attached.get(sub.id);
+    ? archiveFor(row.consultant, row.period_year, Number(row.period_month) - 1, kind) : null;
 
+  if (!target) {
+    const note = document.createElement('p');
+    note.className = 'signhint';
+    note.textContent = uploadWaitingWords(row, kind);
+    cell.appendChild(note);
+    if (filed) cell.appendChild(onFileNote(filed, row, kind, false));
+    return cell;
+  }
+
+  const file = attached.get(target.id);
   if (file) {
     /* Put on, not sent. The cell names the file it is holding, offers it to
        be looked at, and offers to let it go again — all three, because the
        only thing worse than the wrong scan is the wrong scan nobody read. */
     const ready = signingDocument(file.name,
       `${Math.max(1, Math.round(file.size / 1024))} KB \u00b7 Ready to submit`, [
-        labelledIcon('view', 'View', 'View the signed copy chosen for ' + who,
-                     () => openFilePreview(`${sub.consultant || ''} \u2014 ${periodOf(sub)}`, file.name, file)),
-        button('Remove', 'ghost small', () => { attached.delete(sub.id); renderSignUpload(); })
+        labelledIcon('view', 'View', `View the signed ${what} chosen for ${who}`,
+                     () => openFilePreview(`${row.consultant || ''} \u2014 ${periodOf(row)}`,
+                                           file.name, file)),
+        button('Remove', 'ghost small', () => { attached.delete(target.id); renderSignUpload(); })
       ]);
     ready.classList.add('signready-doc');
     cell.appendChild(ready);
@@ -456,7 +545,7 @@ function uploadCells (sub) {
     pick.className = 'signpick';
     const inp = document.createElement('input');
     inp.type = 'file';
-    inp.setAttribute('aria-label', `Signed time sheet for ${who}`);
+    inp.setAttribute('aria-label', `Signed ${what} for ${who}`);
     inp.accept = '.pdf,.png,.jpg,.jpeg,image/*,application/pdf';
     inp.addEventListener('change', () => {
       const picked = inp.files && inp.files[0];
@@ -467,29 +556,33 @@ function uploadCells (sub) {
         inp.value = '';
         return;
       }
-      attached.set(sub.id, picked);
+      attached.set(target.id, picked);
       renderSignUpload();
     });
     pick.appendChild(inp);
     const hint = document.createElement('small');
     hint.className = 'signhint';
-    hint.textContent = (filed ? 'Choose the replacement. ' : 'Choose the signed time sheet. ') +
+    hint.textContent = (filed ? 'Choose the replacement. ' : `Choose the signed ${what}. `) +
       'PDF or image, up to 12 MB.';
     pick.appendChild(hint);
     cell.appendChild(pick);
   }
 
-  if (filed) {
-    const onFile = signingDocument('Copy on file',
-      'uploaded by ' + (filed.created_by || 'somebody') +
-      (filed.created_at ? ' on ' + new Date(filed.created_at).toLocaleDateString() : '') +
-      ' \u00b7 replaced when you submit', [
-        labelledIcon('view', 'View', 'View the copy on file for ' + who, () => viewFiled(filed, sub))
-      ]);
-    onFile.classList.add('signonfile');
-    cell.appendChild(onFile);
-  }
-  return [sheet, cell];
+  if (filed) cell.appendChild(onFileNote(filed, row, kind, true));
+  return cell;
+}
+
+/** the copy already on the record, and a way to look at it */
+function onFileNote (filed, row, kind, replaceable) {
+  const note = signingDocument('Copy on file',
+    'uploaded by ' + (filed.created_by || 'somebody') +
+    (filed.created_at ? ' on ' + new Date(filed.created_at).toLocaleDateString() : '') +
+    (replaceable ? ' \u00b7 replaced when you submit' : ''), [
+      labelledIcon('view', 'View', 'View the copy on file for ' + (row.consultant || ''),
+                   () => viewFiled(filed, row))
+    ]);
+  note.classList.add('signonfile');
+  return note;
 }
 
 /** look at the copy already on file, without downloading it first */
@@ -508,19 +601,20 @@ async function viewFiled (rec, sub) {
 }
 
 /**
- * The copies already on file for this time sheet's person and month.
+ * The copies already on file for one document, person and month.
  *
- * Only the time sheet's own finished copies. A record old enough not to say
+ * Only that document's own finished copies. A record old enough not to say
  * which document it is covers the invoice as well, and taking it off the
  * record would take the invoice with it.
  */
-function copiesOnFile (sub) {
+function copiesOnFile (sub, kind) {
   const who = String(sub.consultant || '').trim();
+  const want = kind || 'claim';
   return archive.filter(r =>
     String(r.consultant || '').trim() === who &&
     Number(r.period_year) === Number(sub.period_year) &&
     Number(r.period_month) === Number(sub.period_month) &&
-    r.kind === 'claim' && stageOf(r) === ARCHIVE_FINAL);
+    r.kind === want && stageOf(r) === ARCHIVE_FINAL);
 }
 
 /**
@@ -606,13 +700,14 @@ async function submitSigned (go) {
       try {
         const full = await Sync.submission(sub.id);
         const state = mergeDefaults((full && full.data) || {});
+        const kind = kindOf(sub);
         const payload = await Sync.readFile(jobs[i].file);
-        payload.name = kindLabel('claim') + ' (signed) — ' + payload.name;
+        payload.name = kindLabel(kind) + ' (signed) — ' + payload.name;
         // noted before the new copy goes up, since it is about to replace them
-        const before = copiesOnFile(sub);
+        const before = copiesOnFile(sub, kind);
         const kept = await Sync.store(state, [payload],
-          kindLabel('claim') + ' signed by ' + by +
-          (before.length ? ' · replaces the earlier copy' : ''), 'claim', SIGNING_STATUS);
+          kindLabel(kind) + ' signed by ' + by +
+          (before.length ? ' · replaces the earlier copy' : ''), kind, SIGNING_STATUS);
         if (sub.status === SIGNING_STATUS) await Sync.act(sub.id, 'approve', '');
         await dropSuperseded(before, kept);
         attached.delete(sub.id);
@@ -924,7 +1019,7 @@ function adviceFor (sub) {
 function adviceWords (advice) {
   if (!advice) return 'Not prepared';
   if (advice.status === 'complete') return 'Signed and closed';
-  if (advice.status === SIGNING_STATUS) return 'Waiting for your signature';
+  if (advice.status === SIGNING_STATUS) return 'Waiting for the signed copy';
   if (advice.status === 'returned') return 'Sent back';
   return (typeof STATUS_TEXT === 'object' && STATUS_TEXT[advice.status]) || advice.status;
 }
@@ -1004,8 +1099,15 @@ async function renderAdvice () {
         bar.appendChild(go);
       }
     } else if (advice.status === SIGNING_STATUS) {
-      const go = button('Sign and close', 'primary small', () => openAdviceSigning(advice, sub));
-      bar.appendChild(go);
+      /* The HOD signs this on paper, not here, so the last thing that
+         happens to it happens on the Upload step with the signed time
+         sheet. This row says so rather than offering a button that would
+         do half of it. */
+      const said = document.createElement('p');
+      said.className = 'signhint';
+      said.textContent = 'Approved. Print it, have the HOD sign it, and file the signed copy ' +
+        'on the Upload step.';
+      bar.appendChild(said);
     }
     if (bar.children.length) cell.appendChild(bar);
 
@@ -1110,20 +1212,6 @@ function advBand (text, quiet) {
     band.appendChild(small);
   }
   return band;
-}
-
-/**
- * What the profile already answers, answered.
- *
- * Only two of the office's boxes have an answer anywhere in the system, and
- * guessing at the others would be worse than leaving them blank: a payment
- * term nobody agreed, printed as though somebody had, is not a time-saver.
- * Filled only when empty, so a form opened twice keeps what was typed.
- */
-function adviceFromProfile (state) {
-  const a = state.advice;
-  if (!a.staff) a.staff = state.consultant.name || '';
-  if (!a.manager) a.manager = (Auth.personFor('manager') || '');
 }
 
 /** the whole sheet, as a page somebody types on */
@@ -1403,7 +1491,6 @@ async function openAdviceEditor (sub, trigger) {
     preparedName: (Auth.personFor('pa') || ''),
     approvedName: (Auth.personFor('boss') || '')
   }, state.advice || {});
-  adviceFromProfile(state);
   adviceOpen = { sub: sub, state: state };
 
   host.innerHTML = '';
@@ -1485,94 +1572,6 @@ async function prepareAdvice (go) {
   }
 }
 
-/**
- * The last step: two signatures on one form.
- *
- * The HOD approved this advice, and his signature is placed here the way it
- * is placed on a time sheet — by the PA, who holds it. Hers goes in the box
- * the form calls Prepared by, because she is the one who prepared it.
- */
-function openAdviceSigning (advice, invoice) {
-  const host = document.getElementById('adviceList');
-  if (!host || document.getElementById('adviceSign')) return;
-
-  const box = document.createElement('div');
-  box.id = 'adviceSign';
-  box.className = 'decidebox';
-
-  const head = document.createElement('p');
-  head.className = 'decidehead';
-  head.textContent = 'Sign the payment advice';
-  box.appendChild(head);
-
-  const context = document.createElement('p');
-  context.className = 'status-context';
-  context.textContent = `${advice.consultant || ''} \u00b7 ${periodOf(advice)}`;
-  box.appendChild(context);
-
-  const pads = [
-    { key: 'hod', title: 'The HOD\u2019s signature, for Approved by', value: myLastSignature() },
-    { key: 'pa', title: 'Your own signature, for Prepared by', value: myLastSignature() }
-  ];
-  pads.forEach(pad => {
-    const label = document.createElement('p');
-    label.className = 'fieldlabel';
-    label.textContent = pad.title;
-    box.appendChild(label);
-    const padHost = document.createElement('div');
-    padHost.className = 'decidepad sigprofile';
-    box.appendChild(padHost);
-    mountSignaturePicker(padHost, { get: () => pad.value, set: url => { pad.value = url; } });
-  });
-
-  const bar = document.createElement('div');
-  bar.className = 'btnrow';
-  const go = button('Sign and close the advice', 'primary',
-                    () => signAdvice(advice, pads, go));
-  bar.appendChild(go);
-  bar.appendChild(button('Cancel', 'ghost', () => box.remove()));
-  box.appendChild(bar);
-  host.appendChild(box);
-  box.scrollIntoView({ block: 'nearest' });
-}
-
-async function signAdvice (advice, pads, go) {
-  if (signingBusy) return;
-  const missing = pads.filter(p => !p.value);
-  if (missing.length) {
-    toast('Both signatures are needed: the HOD\u2019s and your own.', true);
-    return;
-  }
-
-  signingBusy = true;
-  const was = go.textContent;
-  go.disabled = true;
-  go.textContent = 'Signing…';
-  try {
-    const full = await Sync.submission(advice.id);
-    const state = mergeDefaults((full && full.data) || {});
-    const today = new Date().toISOString().slice(0, 10);
-    state.sig = state.sig || {};
-    pads.forEach(p => { state.sig[p.key] = p.value; });
-    state.advice = Object.assign({}, state.advice, {
-      approvedDate: state.advice && state.advice.approvedDate ? state.advice.approvedDate : today,
-      preparedDate: state.advice && state.advice.preparedDate ? state.advice.preparedDate : today
-    });
-    rememberSignature(pads[0].value);
-    await Sync.act(advice.id, 'approve', '', state);
-    const box = document.getElementById('adviceSign');
-    if (box) box.remove();
-    toast('Signed. That month is closed.');
-    await renderAdvice();
-  } catch (err) {
-    toast(err.message || 'Could not sign it.', true);
-    go.disabled = false;
-    go.textContent = was;
-  } finally {
-    signingBusy = false;
-  }
-}
-
 /* -------------------------------------------------------------------
    A month, as one file
 
@@ -1612,13 +1611,30 @@ async function monthDocument (sub) {
   return { name: base + '.pdf', bytes: new Uint8Array(doc.output('arraybuffer')) };
 }
 
+/** the signed copy on the record for one document of a month, if there is one */
+async function filedCopy (rec, kind) {
+  const found = typeof archiveFor === 'function'
+    ? archiveFor(rec.consultant, rec.period_year, Number(rec.period_month) - 1, kind) : null;
+  if (!found) return null;
+  const stored = await Sync.storedOne(found.id);
+  const f = stored && (stored.files || [])[0];
+  if (!f || !f.content) return null;
+  const type = f.type || 'application/pdf';
+  return { name: archiveFileName(found, f),
+           bytes: dataUrlToBytes('data:' + type + ';base64,' + f.content) };
+}
+
 /**
- * Everything for one person and one month, in one zip.
+ * Everything for one person and one month, compiled into one zip.
  *
- * What is missing is said rather than quietly left out: a month with no
- * payment advice yet produces a zip of two files and a line saying which
- * one is not there, because a folder that is quietly short a document is
- * how somebody finds out a year later.
+ * Three documents: the time sheet, the invoice and the payment advice. For
+ * each one the signed copy on the record is taken if there is one, because a
+ * signed scan is the document and the generated form is only a rendering of
+ * it; where nothing was scanned back, the form is drawn from what was
+ * approved so the month is still whole.
+ *
+ * What is missing is said rather than quietly left out. A folder that is
+ * quietly short a document is how somebody finds out a year later.
  */
 async function downloadMonthZip (rec, control) {
   if (signingBusy) return;
@@ -1627,29 +1643,23 @@ async function downloadMonthZip (rec, control) {
   const files = [];
   const missing = [];
   try {
-    // the signed time sheet, as it came back on paper
-    try {
-      const stored = await Sync.storedOne(rec.id);
-      const f = stored && (stored.files || [])[0];
-      if (f && f.content) {
-        const type = f.type || 'application/pdf';
-        files.push({ name: archiveFileName(rec, f),
-                     bytes: dataUrlToBytes('data:' + type + ';base64,' + f.content) });
-      } else {
-        missing.push('the signed time sheet');
-      }
-    } catch (err) {
-      missing.push('the signed time sheet');
-    }
-
-    // and the two forms the office produced, drawn from what was approved
-    for (const [kind, what] of [['invoice', 'the invoice'], ['advice', 'the payment advice']]) {
+    const wanted = [
+      ['claim', 'the time sheet'],
+      ['invoice', 'the invoice'],
+      ['advice', 'the payment advice']
+    ];
+    for (const pair of wanted) {
+      const kind = pair[0];
+      try {
+        const filed = await filedCopy(rec, kind);
+        if (filed) { files.push(filed); continue; }
+      } catch (err) { /* fall through to drawing it */ }
       const sub = monthSubmission(rec, kind);
-      if (!sub) { missing.push(what); continue; }
+      if (!sub) { missing.push(pair[1]); continue; }
       try {
         files.push(await monthDocument(sub));
       } catch (err) {
-        missing.push(what);
+        missing.push(pair[1]);
       }
     }
 

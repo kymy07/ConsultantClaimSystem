@@ -33,8 +33,10 @@ assert.equal(fullBody.children[1].children[0].textContent,'Zulkifli');
 assert.equal(fullBody.children[1].children[1].children[0].textContent,'Not available');
 const body = wrap.children[0].children[2];
 assert.equal(body.children.length,1);
-assert.equal(body.children[0].children.length,3);
+// name, three documents, and the month itself as one zip
+assert.equal(body.children[0].children.length,5);
 assert.equal(body.children[0].children[0].textContent,'Person <A>');
+assert.equal(body.children[0].children[4].children[0].children[0].textContent,'Compile zip');
 const missing = ctx.historyTable([record]).children[0].children[2].children[0].children[2];
 assert.equal(missing.children[0].textContent,'Not available');
 // every document that is there says what it is called

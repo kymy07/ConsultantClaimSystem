@@ -364,6 +364,12 @@ function collectorRoster () {
  * @param {string[]} [roster] everybody to list, whether or not they have
  *        filed anything — the ones who have not are the point of the list
  */
+/* What each document is called, in the heading and in the label on its
+   buttons. Three kinds now, and spelling them inline meant an expression
+   that could only tell two apart. */
+const HISTORY_COLUMN = { claim: 'Time sheet', invoice: 'Invoice', advice: 'Payment Advice' };
+const HISTORY_WHAT = { claim: 'time sheet', invoice: 'invoice', advice: 'payment advice' };
+
 function historyTable (records, roster) {
   const wrap = document.createElement('div');
   wrap.className = 'history-table-wrap';
@@ -379,7 +385,7 @@ function historyTable (records, roster) {
   table.appendChild(caption);
   const head = document.createElement('thead');
   const titles = document.createElement('tr');
-  ['Consultant', 'Time Sheet', 'Invoice'].forEach(label => {
+  ['Consultant', 'Time Sheet', 'Invoice', 'Payment Advice', 'Month'].forEach(label => {
     const cell = document.createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
@@ -407,9 +413,9 @@ function historyTable (records, roster) {
     person.scope = 'row';
     person.textContent = name;
     row.appendChild(person);
-    ['claim', 'invoice'].forEach(kind => {
+    ['claim', 'invoice', 'advice'].forEach(kind => {
       const cell = document.createElement('td');
-      cell.setAttribute('data-label', kind === 'claim' ? 'Time sheet' : 'Invoice');
+      cell.setAttribute('data-label', HISTORY_COLUMN[kind]);
       // Older records contained both documents and did not carry a kind.
       const matching = copies.filter(r => !r.kind || r.kind === kind);
       let fileCount = 0;
@@ -446,7 +452,7 @@ function historyTable (records, roster) {
         words.title = [f.name, r.invoice_no, r.note].filter(Boolean).join(' \u00B7 ');
         const actions = document.createElement('div');
         actions.className = 'history-document-actions';
-        const what = `${kind === 'claim' ? 'time sheet' : 'invoice'} \u2014 ${name}`;
+        const what = `${HISTORY_WHAT[kind]} \u2014 ${name}`;
         ['view', 'download'].forEach(action => {
           const label = (action === 'view' ? 'View the ' : 'Download the ') + what;
           const control = iconButton(action, label, 'ghost small history-icon',
@@ -476,6 +482,23 @@ function historyTable (records, roster) {
       }
       row.appendChild(cell);
     });
+
+    /* And the month itself. Three documents produced weeks apart by three
+       people is not three downloads to anybody who was asked for
+       "September" — it is one folder, so it is one button. */
+    const whole = document.createElement('td');
+    whole.setAttribute('data-label', 'Month');
+    const anchor = copies.filter(r => r.kind === 'claim')[0] || copies[0] ||
+      { consultant: name, period_year: first.period_year, period_month: first.period_month };
+    const zip = iconButton('download',
+      `Compile every document for ${name}, ${month}, into one zip`,
+      'ghost small history-icon', control => downloadMonthZip(anchor, control));
+    const zipWord = document.createElement('span');
+    zipWord.textContent = 'Compile zip';
+    zip.appendChild(zipWord);
+    whole.appendChild(zip);
+    row.appendChild(whole);
+
     body.appendChild(row);
   });
   table.appendChild(body);

@@ -420,9 +420,9 @@ check('Download lists what is waiting for the HOD’s signature',
    them to whoever collects the paper. */
 check('a scan put on a card is held, not sent',
   /const attached = new Map\(\)/.test(signingjs) &&
-  /attached\.set\(sub\.id, picked\)/.test(signingjs), true);
+  /attached\.set\(target\.id, picked\)/.test(signingjs), true);
 check('and can be read before it goes',
-  /openFilePreview\(`\$\{sub\.consultant/.test(signingjs) &&
+  /openFilePreview\(`\$\{row\.consultant/.test(signingjs) &&
   /function openFilePreview/.test(previewjs), true);
 check('the copy already on file can be read too',
   /async function viewFiled/.test(signingjs), true);
@@ -551,7 +551,8 @@ check('submitting takes the replaced copy off the record',
 check('and only a copy this account may remove',
   /!Auth\.isAdmin\(\) && String\(r\.created_by \|\| ''\)\.toLowerCase\(\) !== mine/.test(signingjs), true);
 check('a combined record is never taken, since it covers the invoice too',
-  /r\.kind === 'claim' && stageOf\(r\) === ARCHIVE_FINAL/.test(signingjs), true);
+  /r\.kind === want && stageOf\(r\) === ARCHIVE_FINAL/.test(signingjs) &&
+  /const want = kind \|\| 'claim'/.test(signingjs), true);
 check("the PA's record of confirmed months is called History",
   /labelFor: \(\) => \(Auth\.keepsRecords\(\) \? 'Filed' : 'History'\)/.test(appjs) &&
   /label\.textContent = stepLabel\(s\)/.test(appjs), true);
@@ -565,7 +566,7 @@ check('the preview is shown before the document is loaded into it',
    PA's Download and Upload pages are the same table the collect list is. */
 check("the PA's pages are tables, like the collect list",
   /signingMonthTables\(host, rows, \['Status', 'Time sheet'\]/.test(signingjs) &&
-  /signingMonthTables\(host, waiting, \['Status', 'Time sheet', 'Signed copy'\]/.test(signingjs) &&
+  /\['Status', 'Time sheet', 'Signed time sheet', 'Signed payment advice'\]/.test(signingjs) &&
   /table\.className = 'history-table signingtable'/.test(signingjs), true);
 /* Everybody with a profile has a line, the way the collect list does, so
    the PA sees who has not sent anything as well as what is waiting. */
@@ -647,9 +648,12 @@ check('only the office boxes are typed into',
   !/advInput\(F\./.test(signingjs), true);
 /* Two of them the system already knows. The rest stay blank: a payment term
    nobody agreed, printed as though somebody had, is not a time-saver. */
-check('what the profile answers is answered',
-  /function adviceFromProfile[\s\S]{0,260}a\.staff = state\.consultant\.name/.test(signingjs) &&
-  /a\.manager = \(Auth\.personFor\('manager'\)/.test(signingjs), true);
+/* And nothing else is guessed at. Staff/Consultant and Account Manager are
+   the office's to answer; a name printed there because it was the nearest
+   one the system held is a name nobody put there. */
+check('nothing on it is guessed',
+  !/adviceFromProfile/.test(signingjs) &&
+  !/a\.staff = /.test(signingjs) && !/a\.manager = /.test(signingjs), true);
 check('the dialog can be closed, and hides when it is',
   /function closeAdviceEditor/.test(signingjs) &&
   /\.editdlg\[hidden\]\{display:none\}/.test(css), true);
@@ -678,7 +682,8 @@ check('submitting closes the month rather than passing it on',
 check('and it files the scan before it closes the month',
   /await Sync\.store\([\s\S]{0,220}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/.test(signingjs), true);
 check('a confirmed month is not offered for upload again',
-  !/Already filed/.test(signingjs) && !/uploadCard\(sub, true\)/.test(signingjs), true);
+  !/uploadCard\(/.test(signingjs) &&
+  /function uploadRows[\s\S]{0,900}waitingSignature\(\)\.forEach/.test(signingjs), true);
 check('and the newest copy is the one everybody reads',
   /sort\(newestFirst\)\[0\]/.test(archivejs) &&
   /latestCopies\(archive\)/.test(archivejs), true);
@@ -716,9 +721,26 @@ check('the office sees it and the consultant does not',
 check('the PA prepares it from the approved invoice',
   /async function prepareAdvice/.test(signingjs) &&
   /Sync\.submit\(state, 'Payment advice for '/.test(signingjs), true);
-check('and signs it twice: the HOD’s box and her own',
-  /key: 'hod'/.test(signingjs) && /key: 'pa'/.test(signingjs) &&
-  /async function signAdvice/.test(signingjs), true);
+/* The HOD signs it on paper, the way he signs a time sheet, so the last
+   thing that happens to an advice happens on the Upload step: the signed
+   scan is filed and the month closes. Writing it and filing it are separate
+   steps because they are separate days. */
+check('the HOD signs it on paper and the PA files the scan',
+  !/async function signAdvice/.test(signingjs) &&
+  !/openAdviceSigning/.test(signingjs) &&
+  /function waitingAdvice[\s\S]{0,200}kindOf\(s\) === 'advice'/.test(signingjs), true);
+check('and the two are separate steps, in the order the job happens',
+  /\{ id: 'todownload'[\s\S]{0,120}\{ id: 'advice'[\s\S]{0,140}\{ id: 'toupload'/
+    .test(appjs), true);
+/* Three documents produced weeks apart is one folder to anybody who was
+   asked for "September", so the administrator's record compiles one. */
+check('the administrator compiles a month into one zip',
+  /Compile zip/.test(archivejs) &&
+  /downloadMonthZip\(anchor, control\)/.test(archivejs) &&
+  /async function filedCopy/.test(signingjs), true);
+check('and it prefers the signed copy over a redrawn one',
+  /const filed = await filedCopy\(rec, kind\);[\s\S]{0,80}files\.push\(filed\)/
+    .test(signingjs), true);
 /* One name per person, not one per document: the rows under it are the same
    person's, and repeating the name three times reads as three people. */
 check('the status table names each person once',
