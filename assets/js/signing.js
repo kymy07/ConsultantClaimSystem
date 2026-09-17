@@ -1355,9 +1355,7 @@ function adviceFormDoc (state, changed) {
     advInput(a.terms, v => set('terms', v),
              { cls: 'w-xs ta-c', placeholder: '30', label: 'Payment term in days', numeric: true }),
     advWord('Days'),
-    advInput(a.backToBack, v => set('backToBack', v),
-             { cls: 'w-xs ta-c', label: 'Back-to-back' }),
-    advWord('Back-To-Back'),
+    advTick('Back-To-Back', !!a.backToBack, on => set('backToBack', on)),
     advTick('Advance Payment', a.advance !== false, on => set('advance', on))
   ]));
 

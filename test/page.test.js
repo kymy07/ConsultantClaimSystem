@@ -685,6 +685,24 @@ check('the preview opens in a tab of its own',
 check('and falls back to the viewer if the tab was blocked',
   /if \(tab && !tab\.closed\) \{[\s\S]{0,320}\} else \{[\s\S]{0,120}openFilePreview/
     .test(signingjs), true);
+/* The office's own PDF is US Letter set in Calibri, with the content
+   running 21.34mm to 194.01mm. Drawn on A4 in Helvetica, every row landed
+   a few millimetres from where the paper expects it; these are the numbers
+   read off that PDF, and the form is drawn to them. */
+const genadvice = fs.readFileSync(path.join(ROOT, 'assets/js/gen-advice.js'), 'utf8');
+check('the payment advice is drawn on Letter, in Calibri metrics',
+  /format: 'letter'/.test(genadvice) && /addCarlito\(doc\)/.test(genadvice) &&
+  /const ADV_FONT = 'Carlito'/.test(genadvice), true);
+check('to the geometry measured off the office’s own sheet',
+  /L: 21\.34, R: 194\.01/.test(genadvice) &&
+  /docCols: \[45\.68, 50\.29, 77\.89, 111\.00, 139\.07, 166\.41, 194\.01\]/.test(genadvice) &&
+  /bands: \{ primary: 31\.50, other: 122\.22, approval: 193\.93, finance: 243\.21 \}/
+    .test(genadvice), true);
+check('with the mark its template prints, not the claim form’s wordmark',
+  /loadLogo\('uzmaAdvice'\)/.test(genadvice) &&
+  /uzmaAdvice: \['assets\/img\/logo-uzma-advice\.png'\]/
+    .test(fs.readFileSync(path.join(ROOT, 'assets/js/logo.js'), 'utf8')) &&
+  fs.existsSync(path.join(ROOT, 'assets/img/logo-uzma-advice.png')), true);
 check('the dialog can be closed, and hides when it is',
   /function closeAdviceEditor/.test(signingjs) &&
   /\.editdlg\[hidden\]\{display:none\}/.test(css), true);
@@ -736,7 +754,6 @@ console.log('\nWhat the PA actually signs');
    ----------------------------------------------------------------------- */
 console.log('\nThe Payment Advice');
 
-const genadvice = fs.readFileSync(path.join(ROOT, 'assets/js/gen-advice.js'), 'utf8');
 check('the form is drawn to the template it copies',
   /function buildAdvicePDF/.test(genadvice) &&
   /UZMA-FA01-IMS-OS01 \(F01\)/.test(genadvice), true);

@@ -13,6 +13,10 @@
 
 const LOGO_SOURCES = {
   uzma:       ['assets/img/logo-uzma.png', 'assets/img/logo-uzma.jpg', 'assets/img/logo-uzma.svg'],
+  /* The payment advice carries the mark with the circles, which is what its
+     own template prints; the claim form carries the wordmark alone. They are
+     two different pieces of artwork, not two sizes of one. */
+  uzmaAdvice: ['assets/img/logo-uzma-advice.png'],
   geospatial: ['assets/img/logo-geospatial.png', 'assets/img/logo-geospatial.jpg', 'assets/img/logo-geospatial.svg']
 };
 
