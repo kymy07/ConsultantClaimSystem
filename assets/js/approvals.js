@@ -501,6 +501,12 @@ function statusRow (name, kind, sub, first) {
       no.textContent = sub.invoice_no;
       who.appendChild(no);
     }
+    /* An empty profile a letter off another is a slip, not a person; the
+       administrator is told so here and offered to take it off. */
+    if (!sub && typeof duplicateProfileNote === 'function') {
+      const dup = duplicateProfileNote(name, () => renderApprovals());
+      if (dup) who.appendChild(dup);
+    }
   }
   tr.appendChild(who);
 

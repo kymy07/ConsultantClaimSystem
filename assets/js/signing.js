@@ -194,6 +194,24 @@ function signingMonthTables (host, rows, columns, cells, options) {
         const lines = opts.lines
           ? opts.lines(name, sub, entry)
           : [sub ? cells(sub) : (opts.missing ? opts.missing(name, entry) : [])];
+        /* A name with nothing under it, one letter off another, gets the
+           administrator's note on its first line; see duplicateProfileNote. */
+        if (!sub) {
+          const dup = duplicateProfileNote(name, () => {
+            const panel = document.querySelector('.panel.active');
+            const id = panel && panel.id;
+            if (id === 'p-advice') renderAdvice();
+            else if (id === 'p-todownload') renderSignDownload();
+            else if (id === 'p-toupload') renderSignUpload();
+          });
+          if (dup && lines[0] && lines[0][0]) {
+            const first = document.createElement('div');
+            first.className = 'signcell';
+            first.appendChild(lines[0][0]);
+            first.appendChild(dup);
+            lines[0][0] = first;
+          }
+        }
         lines.forEach((content, n) => {
           const row = document.createElement('tr');
           if (!sub && !opts.lines) row.className = 'signrow-quiet';
@@ -1894,4 +1912,83 @@ async function sendToFinance (rec, control) {
   const project = await financeProject(rec);
   window.location.href = financeMailto(rec, project);
   toast('The zip is in your downloads. Attach it to the message that just opened.');
+}
+
+/* -------------------------------------------------------------------
+   One person, twice
+
+   A name typed twice with one letter different is two profiles, and every
+   table here then lists the same person twice. Nothing can merge them —
+   the documents carry the name they were filed under, and rewriting that
+   on a filed claim is not something this app should do — but when one of
+   the two has nothing under it at all, it is not a second person: it is a
+   slip, and the fix is to take the empty one off.
+
+   So a row for a profile with nothing filed under it, whose name is a
+   letter or two from another, says so to the administrator and offers
+   that one thing. It never guesses about a profile that has documents.
+   ------------------------------------------------------------------- */
+
+/** how many single-letter edits turn one name into the other */
+function nameDistance (a, b) {
+  a = String(a || '').toLowerCase(); b = String(b || '').toLowerCase();
+  if (a === b) return 0;
+  let prev = [...Array(b.length + 1).keys()];
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * True when nothing at all has been filed under this exact name.
+ *
+ * Read off whichever list of submissions this page loaded — the PA pages
+ * keep one, the Status table keeps its own — and off the archive. When no
+ * list has been loaded at all the answer is "not known", which is false:
+ * an offer to remove a profile must never rest on an empty cache.
+ */
+function nothingFiledUnder (name) {
+  const who = String(name || '').trim();
+  const mine = signingSubs || [];
+  const theirs = (typeof subs !== 'undefined' && Array.isArray(subs)) ? subs : [];
+  if (!mine.length && !theirs.length) return false;
+  const under = s => String(s.consultant || '').trim() === who;
+  if (mine.some(under) || theirs.some(under)) return false;
+  const filed = typeof archive !== 'undefined' ? archive : [];
+  return !filed.some(r => String(r.consultant || '').trim() === who);
+}
+
+/** the other name this one looks like a slip of, if there is one */
+function likelyDuplicateOf (name, roster) {
+  const who = String(name || '').trim();
+  return (roster || signingRoster()).filter(n => n !== who && nameDistance(n, who) <= 2)[0] || '';
+}
+
+/**
+ * The note and the one button, for the administrator, on an empty
+ * duplicate's row. Null for everybody else and every other row.
+ */
+function duplicateProfileNote (name, after) {
+  if (typeof Auth === 'undefined' || !Auth.isAdmin()) return null;
+  if (!nothingFiledUnder(name)) return null;
+  const other = likelyDuplicateOf(name);
+  if (!other) return null;
+
+  const note = document.createElement('div');
+  note.className = 'dupnote';
+  const said = document.createElement('span');
+  said.textContent = `Looks like a slip of “${other}” — nothing has been filed ` +
+    'under this spelling.';
+  note.appendChild(said);
+  note.appendChild(button('Remove this profile', 'ghost small danger', () => {
+    if (typeof removeProfile !== 'function') return;
+    removeProfile(name);
+    if (after) after();
+  }));
+  return note;
 }

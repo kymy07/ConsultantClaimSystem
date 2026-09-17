@@ -804,6 +804,21 @@ check('the administrator compiles a month into one zip',
    file to a message it did not send, so the app does the two things it can:
    the zip to the downloads folder, and the mail client opened on a message
    already addressed and written — the office's own wording and addresses. */
+/* One person typed twice, a letter apart, is two rows everywhere. Nothing can
+   merge them — the documents carry the name they were filed under — but an
+   empty one is a slip, and the administrator is offered to take it off. Only
+   the administrator, only when nothing is filed under it, and never on the
+   strength of an empty cache. */
+check('an empty duplicate profile is pointed out to the administrator',
+  /function duplicateProfileNote/.test(signingjs) &&
+  /if \(typeof Auth === 'undefined' \|\| !Auth\.isAdmin\(\)\) return null;/.test(signingjs) &&
+  /if \(!nothingFiledUnder\(name\)\) return null;/.test(signingjs) &&
+  /nameDistance\(n, who\) <= 2/.test(signingjs), true);
+check('and never on the strength of an empty cache',
+  /if \(!mine\.length && !theirs\.length\) return false;/.test(signingjs), true);
+check('the note is on the PA’s tables and the Status table alike',
+  /const dup = duplicateProfileNote\(name, \(\) => \{/.test(signingjs) &&
+  /duplicateProfileNote\(name, \(\) => renderApprovals\(\)\)/.test(approvals), true);
 check('the administrator sends a month to Finance',
   /Email Finance/.test(archivejs) && /sendToFinance\(anchor, control\)/.test(archivejs) &&
   /const FINANCE_MAIL = /.test(signingjs) && /adib\.azman@uzmagroup\.com/.test(signingjs) &&
