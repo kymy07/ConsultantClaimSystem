@@ -2165,25 +2165,31 @@ function likelyDuplicateOf (name, roster) {
 }
 
 /**
- * The note and the one button, for the administrator, on an empty
- * duplicate's row. Null for everybody else and every other row.
+ * The note on an empty duplicate's row, and the one button.
+ *
+ * The note is for everybody: whoever is looking at two rows for one person
+ * should be told why there are two, whether or not they can do anything
+ * about it. The button is the administrator's alone, because taking a
+ * profile off the shared list is theirs to do. Null on every other row.
  */
 function duplicateProfileNote (name, after) {
-  if (typeof Auth === 'undefined' || !Auth.isAdmin()) return null;
   if (!nothingFiledUnder(name)) return null;
   const other = likelyDuplicateOf(name);
   if (!other) return null;
+  const admin = typeof Auth !== 'undefined' && Auth.isAdmin();
 
   const note = document.createElement('div');
   note.className = 'dupnote';
   const said = document.createElement('span');
   said.textContent = `Looks like a slip of “${other}” — nothing has been filed ` +
-    'under this spelling.';
+    'under this spelling.' + (admin ? '' : ' The administrator can take it off.');
   note.appendChild(said);
-  note.appendChild(button('Remove this profile', 'ghost small danger', () => {
-    if (typeof removeProfile !== 'function') return;
-    removeProfile(name);
-    if (after) after();
-  }));
+  if (admin) {
+    note.appendChild(button('Remove this profile', 'ghost small danger', () => {
+      if (typeof removeProfile !== 'function') return;
+      removeProfile(name);
+      if (after) after();
+    }));
+  }
   return note;
 }

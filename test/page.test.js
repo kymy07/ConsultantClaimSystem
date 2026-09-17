@@ -833,9 +833,10 @@ check('the administrator compiles a month into one zip, everybody at once',
    empty one is a slip, and the administrator is offered to take it off. Only
    the administrator, only when nothing is filed under it, and never on the
    strength of an empty cache. */
-check('an empty duplicate profile is pointed out to the administrator',
+check('an empty duplicate profile is pointed out to everybody, and offered to the administrator',
   /function duplicateProfileNote/.test(signingjs) &&
-  /if \(typeof Auth === 'undefined' \|\| !Auth\.isAdmin\(\)\) return null;/.test(signingjs) &&
+  /const admin = typeof Auth !== 'undefined' && Auth\.isAdmin\(\);/.test(signingjs) &&
+  /if \(admin\) \{[\s\S]{0,80}Remove this profile/.test(signingjs) &&
   /if \(!nothingFiledUnder\(name\)\) return null;/.test(signingjs) &&
   /nameDistance\(n, who\) <= 2/.test(signingjs), true);
 check('and never on the strength of an empty cache',
