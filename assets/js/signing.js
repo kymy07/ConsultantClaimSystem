@@ -1000,7 +1000,8 @@ async function renderAdvice () {
     bar.className = 'btnrow';
     if (!advice) {
       if (adviceUnlocked(sub)) {
-        bar.appendChild(button('Edit', 'primary small', () => openAdviceEditor(sub)));
+        const go = button('Edit', 'primary small', () => openAdviceEditor(sub, go));
+        bar.appendChild(go);
       }
     } else if (advice.status === SIGNING_STATUS) {
       const go = button('Sign and close', 'primary small', () => openAdviceSigning(advice, sub));
@@ -1019,87 +1020,367 @@ async function renderAdvice () {
 /* -------------------------------------------------------------------
    Writing one
 
-   The form fills itself in: the vendor, the invoice it pays, the amount and
-   the month all come from the invoice the consultant sent, and none of them
-   can be typed here, because a payment advice that disagrees with its own
-   invoice is the one mistake this form can make.
+   It is filled in the way every other document here is filled in: on the
+   form itself. The boxes are where the printed sheet puts them, so somebody
+   who has filled one in on paper is not learning a new screen — they are
+   looking at the same sheet with the typing done for them.
 
-   What is left over is the office's own \u2014 the payment term, a PO or
-   project code if there is one, who the account manager is, and the tax.
-   Those are the boxes this panel offers, and they are the only ones.
+   Most of it is already known and none of that is offered: the vendor, the
+   invoice it pays, the amount and the month come from the claim, because a
+   payment advice that disagrees with its own invoice is the one mistake this
+   form can make. What is left is the office's own, and what the profile
+   already answers is answered.
    ------------------------------------------------------------------- */
 
-/** a labelled input, drawn the way the profile form draws one */
-function adviceInput (label, hint, value, onChange, opts) {
+/** a value the invoice decided: shown in its box, not offered for typing */
+function advFixed (value, cls) {
+  const cell = document.createElement('span');
+  cell.className = 'adv-box adv-fixed' + (cls ? ' ' + cls : '');
+  cell.textContent = value == null ? '' : String(value);
+  return cell;
+}
+
+/** one of the office's own boxes, typed into where the sheet has it */
+function advInput (value, onChange, opts) {
   const o = opts || {};
-  const wrap = document.createElement('label');
-  wrap.appendChild(document.createTextNode(label + ' '));
-  if (hint) {
-    const small = document.createElement('span');
-    small.className = 'hint';
-    small.textContent = hint;
-    wrap.appendChild(small);
-  }
-  const input = o.choices ? document.createElement('select') : document.createElement('input');
-  if (o.choices) {
-    o.choices.forEach(pair => {
-      const option = document.createElement('option');
-      option.value = pair[0];
-      option.textContent = pair[1];
-      input.appendChild(option);
-    });
-  } else if (o.placeholder) {
-    input.placeholder = o.placeholder;
-  }
+  const input = document.createElement('input');
+  input.className = 'adv-box adv-in' + (o.cls ? ' ' + o.cls : '');
   input.value = value == null ? '' : String(value);
+  if (o.placeholder) input.placeholder = o.placeholder;
+  if (o.label) input.setAttribute('aria-label', o.label);
+  if (o.numeric) { input.inputMode = 'numeric'; }
   const tell = () => onChange(input.value);
   input.addEventListener('input', tell);
   input.addEventListener('change', tell);
-  wrap.appendChild(input);
-  return wrap;
-}
-
-/** one line of what the invoice already decided, which cannot be typed over */
-function adviceFact (label, value) {
-  const line = document.createElement('div');
-  line.className = 'advicefact';
-  const name = document.createElement('span');
-  name.className = 'advicefact-label';
-  name.textContent = label;
-  const text = document.createElement('span');
-  text.className = 'advicefact-value';
-  text.textContent = value || '\u2014';
-  line.appendChild(name);
-  line.appendChild(text);
-  return line;
+  return input;
 }
 
 /**
- * Open one person's payment advice for the month, filled in from the invoice.
+ * One of the form's tick boxes.
  *
- * It is opened rather than generated in the background so the PA can see what
- * the form will say before it goes anywhere, and print a draft to check it
- * against the paper one.
+ * They behave as the paper does: ticking Yes unticks No, because the sheet
+ * has one answer and two boxes. A checkbox rather than a radio, so that
+ * clicking the ticked one clears it back to unanswered, which is the state
+ * the form starts in and a perfectly good answer for a box marked
+ * "if applicable".
  */
-async function openAdviceEditor (sub) {
-  const host = document.getElementById('adviceList');
-  if (!host) return;
-  const open = document.getElementById('adviceEdit');
-  if (open) open.remove();
+function advTick (text, on, onPick) {
+  const wrap = document.createElement('label');
+  wrap.className = 'adv-tick';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = !!on;
+  input.addEventListener('change', () => onPick(input.checked));
+  const word = document.createElement('span');
+  word.textContent = text;
+  wrap.appendChild(input);
+  wrap.appendChild(word);
+  return wrap;
+}
 
-  const box = document.createElement('div');
-  box.id = 'adviceEdit';
-  box.className = 'decidebox';
-  const head = document.createElement('p');
-  head.className = 'decidehead';
-  head.textContent = 'Payment advice \u00b7 ' + (sub.consultant || '');
-  box.appendChild(head);
+/** a labelled line of the form: the label on the left, the boxes beside it */
+function advRow (label, nodes, cls) {
+  const row = document.createElement('div');
+  row.className = 'adv-row' + (cls ? ' ' + cls : '');
+  const name = document.createElement('span');
+  name.className = 'adv-label';
+  name.textContent = label;
+  row.appendChild(name);
+  const rest = document.createElement('div');
+  rest.className = 'adv-fields';
+  nodes.forEach(n => rest.appendChild(typeof n === 'string' ? advWord(n) : n));
+  row.appendChild(rest);
+  return row;
+}
+
+function advWord (text, cls) {
+  const span = document.createElement('span');
+  span.className = 'adv-word' + (cls ? ' ' + cls : '');
+  span.textContent = text;
+  return span;
+}
+
+function advBand (text, quiet) {
+  const band = document.createElement('div');
+  band.className = 'adv-band';
+  band.textContent = text;
+  if (quiet) {
+    const small = document.createElement('i');
+    small.textContent = ' ' + quiet;
+    band.appendChild(small);
+  }
+  return band;
+}
+
+/**
+ * What the profile already answers, answered.
+ *
+ * Only two of the office's boxes have an answer anywhere in the system, and
+ * guessing at the others would be worse than leaving them blank: a payment
+ * term nobody agreed, printed as though somebody had, is not a time-saver.
+ * Filled only when empty, so a form opened twice keeps what was typed.
+ */
+function adviceFromProfile (state) {
+  const a = state.advice;
+  if (!a.staff) a.staff = state.consultant.name || '';
+  if (!a.manager) a.manager = (Auth.personFor('manager') || '');
+}
+
+/** the whole sheet, as a page somebody types on */
+function adviceFormDoc (state, changed) {
+  const F = adviceFields(state);
+  const a = state.advice;
+  const set = (key, value) => { a[key] = value; changed(); };
+
+  const doc = document.createElement('div');
+  doc.className = 'doc doc-advice';
+
+  /* ---- the letterhead ---- */
+  const head = document.createElement('div');
+  head.className = 'adv-head';
+  const titles = document.createElement('div');
+  titles.className = 'adv-titles';
+  const h = document.createElement('b');
+  h.textContent = 'PAYMENT ADVICE';
+  const sub = document.createElement('span');
+  sub.textContent = '( To Vendor )';
+  titles.appendChild(h);
+  titles.appendChild(sub);
+  const addr = document.createElement('div');
+  addr.className = 'adv-letter';
+  ['Uzma Engineering Sdn. Bhd.', 'Uzma Tower,', 'No 2, Jalan PJU 8/8A, Damansara Perdana,',
+   '47820 Petaling Jaya, Selangor, Malaysia.', 'Tel : +603.7611.4000', 'Fax: +603.7611.4100']
+    .forEach(line => {
+      const p = document.createElement('span');
+      p.textContent = line;
+      addr.appendChild(p);
+    });
+  head.appendChild(titles);
+  head.appendChild(addr);
+  doc.appendChild(head);
+
+  /* ---- primary details ---- */
+  doc.appendChild(advBand('Primary Details'));
+  doc.appendChild(advRow('Department Code', [advFixed(F.dept, 'w-sm')]));
+  doc.appendChild(advRow('Vendor Name', [advFixed(F.vendor, 'w-full')]));
+  doc.appendChild(advRow('Vendor Address', [advFixed(F.address, 'w-full adv-tall')]));
+  doc.appendChild(advRow('Payment Term', [
+    advInput(a.terms, v => set('terms', v),
+             { cls: 'w-xs ta-c', placeholder: '30', label: 'Payment term in days', numeric: true }),
+    advWord('Days'),
+    advInput(a.backToBack, v => set('backToBack', v),
+             { cls: 'w-xs ta-c', label: 'Back-to-back' }),
+    advWord('Back-To-Back'),
+    advTick('Advance Payment', a.advance !== false, on => set('advance', on))
+  ]));
+
+  /* ---- the documents this advice pays against ---- */
+  const table = document.createElement('table');
+  table.className = 'adv-docs';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>#</th><th>Invoice / Bill Number</th><th>Invoice / Bill Received Date</th>
+        <th>PO Number<br><i>(if applicable)</i></th>
+        <th>Project Code<br><i>(if applicable)</i></th><th>Amount</th>
+      </tr>
+      <tr class="adv-attach">
+        <td></td><td>- Attach Invoice / Bill -</td><td></td>
+        <td>- Attach PO -</td><td>- Attach PFS -</td><td></td>
+      </tr>
+    </thead>
+    <tbody></tbody>`;
+  const body = table.querySelector('tbody');
+  for (let n = 1; n <= 5; n++) {
+    const tr = document.createElement('tr');
+    const idx = document.createElement('td');
+    idx.textContent = String(n);
+    idx.className = 'ta-c';
+    tr.appendChild(idx);
+    for (let c = 0; c < 5; c++) {
+      const td = document.createElement('td');
+      if (n === 1) {
+        if (c === 0) td.appendChild(advFixed(F.invoiceNo, 'bare ta-c'));
+        if (c === 1) td.appendChild(advFixed(F.received, 'bare ta-c'));
+        if (c === 2) td.appendChild(advInput(a.poNo, v => set('poNo', v),
+          { cls: 'bare ta-c', label: 'PO number' }));
+        if (c === 3) td.appendChild(advInput(a.projectCode, v => set('projectCode', v),
+          { cls: 'bare ta-c', label: 'Project code' }));
+        if (c === 4) td.appendChild(advFixed('RM' + money(F.amount), 'bare ta-r'));
+      }
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  const foot = document.createElement('tr');
+  foot.className = 'adv-total';
+  foot.innerHTML = `<td colspan="4"><i>Notes: Arrange the attachments in sequence start with
+    Invoice, Bill, PO, PFS, TRF and others.</i></td><td class="ta-r">TOTAL</td>`;
+  const total = document.createElement('td');
+  total.className = 'ta-r';
+  total.appendChild(advFixed('RM' + money(F.amount), 'bare ta-r strong'));
+  foot.appendChild(total);
+  body.appendChild(foot);
+  doc.appendChild(advRow('Documents', [table], 'adv-docrow'));
+
+  /* ---- other details: the left column, then the panels beside it ---- */
+  doc.appendChild(advBand('Other Details', '(If applicable)'));
+  const other = document.createElement('div');
+  other.className = 'adv-other';
+
+  const left = document.createElement('div');
+  left.className = 'adv-otherleft';
+  left.appendChild(advRow('Details of Payment', [advFixed(F.details, 'w-full adv-tall')]));
+  const note = document.createElement('p');
+  note.className = 'adv-note';
+  note.textContent = 'For services paying to foreign beneficiary, please indicate whether ' +
+    'services are rendered inside or outside Malaysia.';
+  left.appendChild(note);
+  left.appendChild(advRow('Staff/ Consultant', [
+    advInput(a.staff, v => set('staff', v), { cls: 'w-md', label: 'Staff or consultant' }),
+    advWord('- Attach TRF -', 'adv-attachword')
+  ]));
+  left.appendChild(advRow('Chargeable to Client', [
+    advTick('Yes', a.chargeable === 'yes', on => set('chargeable', on ? 'yes' : '')),
+    advTick('No', a.chargeable === 'no', on => set('chargeable', on ? 'no' : ''))
+  ]));
+  left.appendChild(advRow('Account Manager', [
+    advInput(a.manager, v => set('manager', v), { cls: 'w-md', label: 'Account manager' })
+  ]));
+  left.appendChild(advRow('Cost Category',
+    ADV_CATEGORIES.map(c => advTick(c, a.category === c, on => set('category', on ? c : '')))));
+  other.appendChild(left);
+
+  const right = document.createElement('div');
+  right.className = 'adv-otherright';
+  const gl = document.createElement('table');
+  gl.className = 'adv-gl';
+  gl.innerHTML = '<thead><tr><th>GL Code</th><th>Amount</th></tr></thead><tbody></tbody>';
+  const glBody = gl.querySelector('tbody');
+  ADV_GL.forEach(code => {
+    const tr = document.createElement('tr');
+    const c = document.createElement('td');
+    c.textContent = code;
+    c.className = 'ta-c';
+    const v = document.createElement('td');
+    v.className = 'ta-r';
+    if (code === ADV_DEPT) v.textContent = 'RM' + money(F.amount);
+    tr.appendChild(c);
+    tr.appendChild(v);
+    glBody.appendChild(tr);
+  });
+  const charge = document.createElement('div');
+  charge.className = 'adv-charge';
+  charge.appendChild(advWord('Charge Back To', 'adv-turn'));
+  charge.appendChild(gl);
+  right.appendChild(charge);
+
+  const tax = document.createElement('div');
+  tax.className = 'adv-tax';
+  const taxHead = document.createElement('b');
+  taxHead.textContent = 'Witholding Tax';
+  tax.appendChild(taxHead);
+  const pct = document.createElement('div');
+  pct.className = 'adv-taxrow';
+  pct.appendChild(advWord('Yes, percentage:'));
+  pct.appendChild(advInput(a.withholding, v => set('withholding', v),
+    { cls: 'w-xs ta-c', label: 'Withholding tax percentage', numeric: true }));
+  pct.appendChild(advWord('%'));
+  tax.appendChild(pct);
+  ['Verified by:', 'Name :', 'Date  :'].forEach(line => {
+    const p = document.createElement('div');
+    p.className = 'adv-taxline';
+    p.appendChild(advWord(line));
+    tax.appendChild(p);
+  });
+  const dept = document.createElement('span');
+  dept.className = 'adv-taxdept';
+  dept.textContent = '(Tax Department)';
+  tax.appendChild(dept);
+  right.appendChild(tax);
+  other.appendChild(right);
+  doc.appendChild(other);
+
+  /* ---- who prepared it, and who approved it ---- */
+  doc.appendChild(advBand('Payment Advice Approval'));
+  const sign = document.createElement('div');
+  sign.className = 'adv-sign';
+  [
+    ['Prepared by :', F.preparedName, F.preparedDate, ''],
+    ['Reviewed by :', '', '', '(if required)'],
+    ['Approved by :', F.approvedName, F.approvedDate, '']
+  ].forEach(col => {
+    const cell = document.createElement('div');
+    cell.className = 'adv-signcol';
+    const title = document.createElement('b');
+    title.textContent = col[0];
+    cell.appendChild(title);
+    if (col[3]) {
+      const small = document.createElement('i');
+      small.textContent = col[3];
+      cell.appendChild(small);
+    }
+    const rule = document.createElement('span');
+    rule.className = 'adv-rule';
+    cell.appendChild(rule);
+    const name = document.createElement('div');
+    name.className = 'adv-signline';
+    name.appendChild(advWord('Name :'));
+    name.appendChild(advFixed(col[1], 'bare'));
+    cell.appendChild(name);
+    const when = document.createElement('div');
+    when.className = 'adv-signline';
+    when.appendChild(advWord('Date  :'));
+    when.appendChild(advFixed(col[2], 'bare'));
+    cell.appendChild(when);
+    sign.appendChild(cell);
+  });
+  doc.appendChild(sign);
+
+  doc.appendChild(advBand('Finance Account Payable Department'));
+  const fin = document.createElement('div');
+  fin.className = 'adv-fin';
+  fin.appendChild(advWord('Received by :'));
+  fin.appendChild(advWord('Received Date :'));
+  doc.appendChild(fin);
+
+  const footer = document.createElement('div');
+  footer.className = 'adv-foot';
+  ['UZMA-FA01-IMS-OS01 (F01)', 'Rev. No. : 05', 'Rev. Date: 19 Jan 2018']
+    .forEach(t => footer.appendChild(advWord(t)));
+  doc.appendChild(footer);
+
+  return doc;
+}
+
+/* The dialog's own state: which invoice is open, and the form built for it. */
+let adviceOpen = null;
+let adviceBackground = [];
+let adviceScroll = '';
+let adviceTrigger = null;
+
+/**
+ * Open one person's payment advice for the month.
+ *
+ * It opens as a page of its own rather than a panel under the table, because
+ * it is a document being worked on and not a row being edited.
+ */
+async function openAdviceEditor (sub, trigger) {
+  const box = document.getElementById('adviceEditor');
+  const host = document.getElementById('adviceEditorForm');
+  if (!box || !host) return;
+
+  adviceTrigger = trigger || document.activeElement;
+  adviceOpen = null;
+  host.innerHTML = '';
+  const who = document.getElementById('adviceEditorWho');
+  if (who) who.textContent = `${sub.consultant || ''} · ${periodOf(sub)}`;
+
   const loading = document.createElement('p');
   loading.className = 'signhint';
-  loading.textContent = 'Reading the invoice\u2026';
-  box.appendChild(loading);
-  host.appendChild(box);
-  box.scrollIntoView({ block: 'nearest' });
+  loading.textContent = 'Reading the invoice…';
+  host.appendChild(loading);
+  showAdviceEditor(box);
 
   let state;
   try {
@@ -1111,83 +1392,58 @@ async function openAdviceEditor (sub) {
     return;
   }
 
-  /* The one number on this form that must never be blank. It is the invoice's
-     own, and if the stored form somehow lacks it the row still knows it. */
+  /* The one number on this form that must never be blank. It is the
+     invoice's own, and the row knows it even if the stored form does not. */
   if (!state.invoice.no && sub.invoice_no) state.invoice.no = sub.invoice_no;
 
   const today = new Date().toISOString().slice(0, 10);
-  const a = Object.assign({
+  state.advice = Object.assign({
     receivedDate: today,
     preparedDate: today,
     preparedName: (Auth.personFor('pa') || ''),
     approvedName: (Auth.personFor('boss') || '')
   }, state.advice || {});
-  state.advice = a;
+  adviceFromProfile(state);
+  adviceOpen = { sub: sub, state: state };
 
-  loading.remove();
+  host.innerHTML = '';
+  host.appendChild(adviceFormDoc(state, () => {}));
+}
 
-  const context = document.createElement('p');
-  context.className = 'status-context';
-  context.textContent = `${periodOf(sub)} \u00b7 invoice ${sub.invoice_no || ''}`;
-  box.appendChild(context);
+/** put the dialog up, and put the page behind it out of reach */
+function showAdviceEditor (box) {
+  box.hidden = false;
+  adviceScroll = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  adviceBackground = Array.from(document.body.children)
+    .filter(el => el !== box && el.tagName !== 'SCRIPT' && el.id !== 'toast')
+    .map(el => { const was = el.inert; el.inert = true; return [el, was]; });
+  const close = document.getElementById('adviceEditorClose');
+  if (close) close.focus();
+}
 
-  const F = adviceFields(state);
-  const facts = document.createElement('div');
-  facts.className = 'advicefacts';
-  [
-    ['Vendor', F.vendor],
-    ['Address', F.address],
-    ['Invoice / Bill Number', F.invoiceNo],
-    ['Amount', 'RM' + money(F.amount)],
-    ['Details of Payment', F.details],
-    ['Prepared by', F.preparedName],
-    ['Approved by', F.approvedName]
-  ].forEach(pair => facts.appendChild(adviceFact(pair[0], pair[1])));
-  box.appendChild(facts);
-
-  const said = document.createElement('p');
-  said.className = 'signsaid';
-  said.textContent = 'Those come from the invoice and cannot be changed here. The boxes below ' +
-    'are the office\u2019s own, and every one of them may be left blank.';
-  box.appendChild(said);
-
-  const grid = document.createElement('div');
-  grid.className = 'grid2';
-  grid.appendChild(adviceInput('Payment Term (days)', '', a.terms,
-                               v => { a.terms = v; }, { placeholder: 'e.g. 30' }));
-  grid.appendChild(adviceInput('Back-To-Back', '', a.backToBack, v => { a.backToBack = v; }));
-  grid.appendChild(adviceInput('PO Number', '(if applicable)', a.poNo, v => { a.poNo = v; }));
-  grid.appendChild(adviceInput('Project Code', '(if applicable)', a.projectCode,
-                               v => { a.projectCode = v; }));
-  grid.appendChild(adviceInput('Staff / Consultant', '', a.staff, v => { a.staff = v; }));
-  grid.appendChild(adviceInput('Account Manager', '', a.manager, v => { a.manager = v; }));
-  grid.appendChild(adviceInput('Chargeable to Client', '', a.chargeable, v => { a.chargeable = v; },
-    { choices: [['', 'Not marked'], ['yes', 'Yes'], ['no', 'No']] }));
-  grid.appendChild(adviceInput('Cost Category', '', a.category, v => { a.category = v; },
-    { choices: [['', 'Not marked']].concat(ADV_CATEGORIES.map(c => [c, c])) }));
-  grid.appendChild(adviceInput('Witholding Tax (%)', '', a.withholding,
-                               v => { a.withholding = v; }, { placeholder: 'e.g. 10' }));
-  box.appendChild(grid);
-
-  const bar = document.createElement('div');
-  bar.className = 'btnrow';
-  const send = button('Send for approval', 'primary', () => prepareAdvice(sub, state, send));
-  bar.appendChild(send);
-  bar.appendChild(button('Preview', 'ghost', control => previewAdvice(sub, state, control)));
-  bar.appendChild(button('Cancel', 'ghost', () => box.remove()));
-  box.appendChild(bar);
-  box.scrollIntoView({ block: 'nearest' });
+/** and take it down again */
+function closeAdviceEditor (restoreFocus) {
+  const box = document.getElementById('adviceEditor');
+  if (!box || box.hidden) return;
+  box.hidden = true;
+  adviceOpen = null;
+  adviceBackground.forEach(pair => { pair[0].inert = pair[1]; });
+  adviceBackground = [];
+  document.body.style.overflow = adviceScroll;
+  if (restoreFocus !== false && adviceTrigger && adviceTrigger.isConnected) adviceTrigger.focus();
+  adviceTrigger = null;
 }
 
 /** the form as it stands, opened the way any other document is opened */
-async function previewAdvice (sub, state, control) {
-  if (signingBusy) return;
+async function previewAdvice (control) {
+  if (signingBusy || !adviceOpen) return;
   signingBusy = true;
   if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
   try {
-    const doc = await buildAdvicePDF(state);
-    openFilePreview('Payment Advice \u00b7 ' + (sub.consultant || ''),
-                    adviceFileBase(state) + '.pdf', doc.output('blob'), 'advice');
+    const doc = await buildAdvicePDF(adviceOpen.state);
+    openFilePreview('Payment Advice · ' + (adviceOpen.sub.consultant || ''),
+                    adviceFileBase(adviceOpen.state) + '.pdf', doc.output('blob'), control);
   } catch (err) {
     toast(err.message || 'Could not draw it.', true);
   } finally {
@@ -1203,8 +1459,10 @@ async function previewAdvice (sub, state, control) {
  * filled in, so nothing is gathered again here. It travels the road the time
  * sheet travels: the project manager, the HOD, then back here to be signed.
  */
-async function prepareAdvice (sub, state, go) {
-  if (signingBusy) return;
+async function prepareAdvice (go) {
+  if (signingBusy || !adviceOpen) return;
+  const sub = adviceOpen.sub;
+  const state = adviceOpen.state;
   const who = `${sub.consultant || 'somebody'} \u00b7 ${periodOf(sub)}`;
   if (!confirm(`Send the payment advice for ${who} for approval?\n\n` +
                'It goes to the project manager, then the HOD, then back here to be signed.')) return;
@@ -1215,8 +1473,7 @@ async function prepareAdvice (sub, state, go) {
   go.textContent = 'Sending\u2026';
   try {
     await Sync.submit(state, 'Payment advice for ' + periodOf(sub), 'advice');
-    const box = document.getElementById('adviceEdit');
-    if (box) box.remove();
+    closeAdviceEditor();
     toast('Payment advice sent to the project manager.');
     await renderAdvice();
   } catch (err) {

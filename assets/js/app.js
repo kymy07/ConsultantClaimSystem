@@ -1333,6 +1333,13 @@ function boot () {
   if (btnDl) btnDl.addEventListener('click', () => renderSignDownload());
   const btnUp = document.getElementById('btnRefreshSignUpload');
   if (btnUp) btnUp.addEventListener('click', () => renderSignUpload());
+  const advPreview = document.getElementById('adviceEditorPreview');
+  if (advPreview) advPreview.addEventListener('click', () => previewAdvice(advPreview));
+  const advSend = document.getElementById('adviceEditorSend');
+  if (advSend) advSend.addEventListener('click', () => prepareAdvice(advSend));
+  const advClose = document.getElementById('adviceEditorClose');
+  if (advClose) advClose.addEventListener('click', () => closeAdviceEditor());
+
   const btnAdvice = document.getElementById('btnRefreshAdvice');
   if (btnAdvice) btnAdvice.addEventListener('click', () => renderAdvice());
   const btnFiled = document.getElementById('btnRefreshFiled');

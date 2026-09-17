@@ -630,11 +630,29 @@ check('the editable invoice moved it too',
   /dlabel">Position:<[\s\S]{0,120}data-bind="consultant\.position"/.test(html) &&
   !/<th style="width:20%">Position<\/th>/.test(html), true);
 
-check('the editor offers the office boxes and no others',
+/* It is filled in on the form itself, the way the claim and the invoice are,
+   and in a page of its own rather than a panel under the table. */
+check('the advice opens as a page, drawn as the sheet it is',
   /function openAdviceEditor/.test(signingjs) &&
-  /adviceInput\('Payment Term \(days\)'/.test(signingjs) &&
-  /adviceInput\('Witholding Tax \(%\)'/.test(signingjs) &&
-  /adviceFact\(pair\[0\], pair\[1\]\)/.test(signingjs), true);
+  /function adviceFormDoc/.test(signingjs) &&
+  /id="adviceEditor"/.test(html) &&
+  /doc\.className = 'doc doc-advice'/.test(signingjs), true);
+/* Nothing the invoice decided may be retyped: it is the invoice's own
+   figures or it is nothing, so those sit in their boxes as text and only the
+   office's own boxes take a cursor. */
+check('only the office boxes are typed into',
+  /function advFixed/.test(signingjs) && /function advInput/.test(signingjs) &&
+  /advFixed\(F\.vendor/.test(signingjs) && /advFixed\(F\.invoiceNo/.test(signingjs) &&
+  /advInput\(a\.terms/.test(signingjs) && /advInput\(a\.withholding/.test(signingjs) &&
+  !/advInput\(F\./.test(signingjs), true);
+/* Two of them the system already knows. The rest stay blank: a payment term
+   nobody agreed, printed as though somebody had, is not a time-saver. */
+check('what the profile answers is answered',
+  /function adviceFromProfile[\s\S]{0,260}a\.staff = state\.consultant\.name/.test(signingjs) &&
+  /a\.manager = \(Auth\.personFor\('manager'\)/.test(signingjs), true);
+check('the dialog can be closed, and hides when it is',
+  /function closeAdviceEditor/.test(signingjs) &&
+  /\.editdlg\[hidden\]\{display:none\}/.test(css), true);
 check('somebody with no time sheet that month reads Not submitted',
   /if \(!sub\) return 'Not submitted'/.test(signingjs), true);
 check('but a claim still with the project manager or the HOD is not called that',

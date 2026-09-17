@@ -559,6 +559,140 @@ body.locked > .sitefoot{display:none}
 /* Same trap as the sign-in gate: display above is an author rule and would
    beat [hidden]{display:none}, leaving the viewer stuck over the app. */
 .pdfview[hidden]{display:none}
+
+/* A document opened to be worked on. Same furniture as the PDF viewer,
+   because it is the same act — looking at a document — with somewhere to
+   type. */
+.editdlg{
+  position:fixed;inset:0;z-index:150;background:rgba(20,28,36,.82);
+  display:flex;flex-direction:column;padding:22px 22px 26px;gap:12px
+}
+.editdlg[hidden]{display:none}
+.editdlg-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;color:#fff;max-width:1060px;width:100%;margin:0 auto
+}
+.editdlg-titles{display:flex;flex-direction:column;gap:2px;min-width:0}
+.editdlg-bar b{font-size:14.5px}
+.editdlg-titles span{font-size:12.5px;color:#cfd9e3;overflow-wrap:anywhere}
+.editdlg-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.editdlg-body{
+  flex:1;min-height:0;width:100%;max-width:1060px;margin:0 auto;overflow:auto;
+  background:#e9eef3;border-radius:10px;padding:18px;
+  box-shadow:0 18px 50px rgba(0,0,0,.4)
+}
+@media(max-width:840px){
+  .editdlg{padding:14px 10px 16px}
+  .editdlg-body{padding:10px}
+}
+
+/* ---- the payment advice as a sheet somebody types on ---- */
+.doc-advice{
+  background:#fff;color:#111;font-size:11.5px;line-height:1.35;
+  padding:18px 20px 22px;min-width:720px;margin:0 auto;max-width:900px;
+  border:1px solid var(--line)
+}
+.doc-advice .adv-head{display:flex;justify-content:space-between;gap:20px;margin-bottom:14px}
+.doc-advice .adv-titles{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
+.doc-advice .adv-titles b{font-size:19px;letter-spacing:.4px}
+.doc-advice .adv-titles span{font-size:14px;font-weight:700}
+.doc-advice .adv-letter{display:flex;flex-direction:column;text-align:right;font-size:9px;color:#333}
+.doc-advice .adv-band{
+  background:#d9d9d9;text-align:center;font-weight:700;font-size:11.5px;
+  padding:3px 6px;margin:10px 0 8px
+}
+.doc-advice .adv-band i{font-weight:400;font-size:10px}
+.doc-advice .adv-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.doc-advice .adv-label{flex:0 0 118px;font-size:10.5px;padding-top:4px}
+.doc-advice .adv-fields{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+.doc-advice .adv-word{font-size:10.5px;white-space:nowrap}
+.doc-advice .adv-attachword{font-style:italic;font-weight:700;font-size:9px}
+
+/* every value sits in one of the form's boxes, typed or not */
+.doc-advice .adv-box{
+  border:1px solid #8a8a8a;background:#fff;padding:3px 6px;min-height:22px;
+  font-size:11px;color:#00209c;display:flex;align-items:center;min-width:0
+}
+.doc-advice .adv-fixed{white-space:pre-wrap;overflow-wrap:anywhere}
+.doc-advice input.adv-in{
+  font:inherit;font-size:11px;color:#00209c;border:1px solid #8a8a8a;
+  border-radius:0;background:#fff;padding:3px 6px;min-height:22px;width:100%
+}
+.doc-advice input.adv-in:focus{outline:2px solid var(--navy-soft);outline-offset:-2px}
+.doc-advice .adv-box.bare,.doc-advice input.adv-in.bare{border:none;background:transparent;width:100%}
+.doc-advice .w-xs{flex:0 0 52px;width:52px}
+.doc-advice .w-sm{flex:0 0 120px;width:120px}
+.doc-advice .w-md{flex:0 0 230px;width:230px}
+.doc-advice .w-full{flex:1 1 auto;width:100%}
+.doc-advice .adv-tall{min-height:40px;align-items:flex-start}
+.doc-advice .ta-c{text-align:center;justify-content:center}
+.doc-advice .ta-r{text-align:right;justify-content:flex-end}
+.doc-advice .strong{font-weight:700}
+
+/* a label is a column elsewhere in this app; on the sheet a tick and its
+   word sit side by side, the way they are printed */
+.doc-advice .adv-tick{display:flex;flex-direction:row;align-items:center;gap:5px;
+  font-size:10.5px;margin:0;white-space:nowrap}
+.doc-advice .adv-tick input{width:15px;height:15px;margin:0;accent-color:#00209c}
+
+.doc-advice .adv-docrow .adv-fields{display:block}
+.doc-advice .adv-docs{width:100%;border-collapse:collapse;table-layout:fixed}
+.doc-advice .adv-docs th,.doc-advice .adv-docs td{
+  border:1px solid #8a8a8a;padding:2px 4px;font-size:9.5px;vertical-align:middle
+}
+.doc-advice .adv-docs th{text-align:center;font-weight:700}
+.doc-advice .adv-docs th i{font-weight:400}
+.doc-advice .adv-docs td{height:22px}
+.doc-advice .adv-docs tr.adv-attach td{
+  font-style:italic;font-weight:700;font-size:8.5px;text-align:center;height:auto
+}
+.doc-advice .adv-docs col:first-child{width:24px}
+.doc-advice .adv-docs tr:first-child th:first-child{width:24px}
+.doc-advice .adv-docs tr.adv-total td{border:none;font-size:8.5px;font-weight:700}
+.doc-advice .adv-docs tr.adv-total i{font-weight:700}
+
+.doc-advice .adv-other{display:flex;gap:14px;align-items:flex-start}
+.doc-advice .adv-otherleft{flex:1 1 60%;min-width:0}
+.doc-advice .adv-otherright{flex:0 0 32%;display:flex;flex-direction:column;gap:10px}
+.doc-advice .adv-note{
+  background:#d9d9d9;margin:0 0 8px 128px;padding:5px 7px;font-size:9.5px
+}
+.doc-advice .adv-charge{display:flex;align-items:stretch;gap:4px}
+.doc-advice .adv-turn{
+  writing-mode:vertical-rl;transform:rotate(180deg);font-size:8.5px;font-weight:700;
+  text-align:center;white-space:normal
+}
+.doc-advice .adv-gl{flex:1;border-collapse:collapse}
+.doc-advice .adv-gl th,.doc-advice .adv-gl td{
+  border:1px solid #8a8a8a;padding:2px 5px;font-size:9.5px;height:18px
+}
+.doc-advice .adv-gl th{font-weight:700;text-align:center}
+.doc-advice .adv-gl th:last-child{text-align:right}
+.doc-advice .adv-gl td.ta-r{color:#00209c}
+.doc-advice .adv-tax{background:#d9d9d9;padding:8px 9px;display:flex;flex-direction:column;gap:5px}
+.doc-advice .adv-tax b{font-size:10.5px}
+.doc-advice .adv-taxrow{display:flex;align-items:center;gap:6px}
+.doc-advice .adv-taxrow .adv-in{background:#fff}
+.doc-advice .adv-taxline{border-bottom:none;font-size:9.5px}
+.doc-advice .adv-taxdept{font-size:8.5px;text-align:right}
+
+.doc-advice .adv-sign{display:flex;gap:14px;margin-top:6px}
+/* the three rules line up with each other, not with whatever is above them:
+   the middle column carries an extra "(if required)" line */
+.doc-advice .adv-signcol{
+  flex:1;display:flex;flex-direction:column;gap:3px;min-width:0;min-height:104px
+}
+.doc-advice .adv-signcol b{font-size:10.5px}
+.doc-advice .adv-signcol i{font-size:8.5px}
+.doc-advice .adv-rule{border-top:1px dashed #8a8a8a;margin-top:auto}
+.doc-advice .adv-signline{display:flex;align-items:baseline;gap:6px;font-size:9.5px}
+.doc-advice .adv-signline .adv-box{min-height:0;padding:0;font-size:9.5px}
+.doc-advice .adv-fin{display:flex;gap:14px;font-size:10.5px;padding:4px 0 26px}
+.doc-advice .adv-fin .adv-word{flex:1}
+.doc-advice .adv-foot{
+  display:flex;justify-content:space-between;gap:10px;font-size:8.5px;
+  border-top:1px solid #d9d9d9;padding-top:6px
+}
 .pdfview-bar{
   display:flex;align-items:center;justify-content:space-between;gap:14px;
   flex-wrap:wrap;color:#fff;max-width:1100px;width:100%;margin:0 auto;
@@ -730,17 +864,6 @@ body.locked > .sitefoot{display:none}
 }
 .signsaid{margin:0;font-size:12.5px;color:var(--muted);max-width:80ch}
 
-/* what the invoice already decided, shown on the payment advice panel but
-   not offered for typing */
-.advicefacts{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
-  gap:6px 20px;padding:12px 14px;border:1px solid var(--line);
-  border-radius:8px;background:#f7fafd
-}
-.advicefact{display:flex;gap:8px;align-items:baseline;min-width:0}
-.advicefact-label{font-size:11.5px;color:var(--muted);flex:0 0 40%}
-.advicefact-value{font-size:12.5px;font-weight:600;color:var(--navy);
-  overflow-wrap:anywhere;min-width:0}
 
 /* ---------- Save Profile, where the details it saves end ---------- */
 .saverow{
