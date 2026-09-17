@@ -2012,9 +2012,13 @@ async function adviceStateFor (invoiceSub, adviceSub) {
   }, state.advice || {});
 
   /* Hers, from the Signature step. The form carries it rather than asking
-     for it again, which is the whole reason it is put there first. */
+     for it again, which is the whole reason it is put there first.
+     Only hers: the signature remembered on this machine belongs to whoever
+     signs here, and every approver's is kept under the same key. Reading an
+     advice from the status table would otherwise have drawn the project
+     manager's own signature into the PA's Prepared by box. */
   state.sig = state.sig || {};
-  if (myLastSignature()) state.sig.pa = myLastSignature();
+  if (Auth.places() && myLastSignature()) state.sig.pa = myLastSignature();
   return state;
 }
 

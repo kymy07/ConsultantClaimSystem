@@ -627,7 +627,23 @@ check('her signature is drawn in the Prepared by box',
 check("the PA puts her own signature on first",
   /\{ id: 'mysign'/.test(appjs) && /id="p-mysign"/.test(html) &&
   /function renderMySignature[\s\S]{0,240}mountSignaturePicker/.test(signingjs) &&
-  /if \(myLastSignature\(\)\) state\.sig\.pa = myLastSignature\(\)/.test(signingjs), true);
+  /if \(Auth\.places\(\) && myLastSignature\(\)\) state\.sig\.pa = myLastSignature\(\)/
+    .test(signingjs), true);
+/* Hers, and only hers. Every approver's own signature is remembered on this
+   machine under one key — it is how the project manager signs a time sheet
+   without redrawing it every month — so an advice read from the status table
+   drew whoever was looking into the PA's Prepared by box. */
+check('and nobody else’s is borrowed for that box',
+  /Only hers: the signature remembered on this machine/.test(signingjs), true);
+/* And that table can read one at all now. An advice nobody wrote is the
+   invoice's own figures, so the approved invoice stands in for it there
+   exactly as it does on the PA's pages, and it opens in the same viewer —
+   an approver checking what they approved does not download it first. */
+check('an approver can read an advice nobody has written',
+  /const paid = kind === 'advice' && typeof previewAdviceFor === 'function'/.test(approvals) &&
+  /button\('Preview', 'ghost small', \(\) => previewAdviceFor\(paid, null, look\)\)/
+    .test(approvals) &&
+  /paid && paid\.status === 'complete'/.test(approvals), true);
 /* Everybody with a profile has a line, the way the collect list does, so
    the PA sees who has not sent anything as well as what is waiting. */
 check("the PA's tables list everybody with a profile",

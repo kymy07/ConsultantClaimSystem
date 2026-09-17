@@ -594,10 +594,28 @@ function statusRow (name, kind, sub, first) {
       acts.appendChild(button('Delete', 'ghost small danger', () => deleteSubmission(sub)));
     }
   } else {
-    const nothing = document.createElement('span');
-    nothing.className = 'statusnone';
-    nothing.textContent = 'not sent';
-    acts.appendChild(nothing);
+    /* A payment advice nobody has written is still a document. It is the
+       invoice's own figures — the vendor, the number, the amount, the month
+       — so once the HOD has approved that invoice the advice is decided,
+       and an approver who wants to read it should not have to wait for
+       somebody to open an editor and press Save on a form there is nothing
+       to change on. The invoice stands in for it, exactly as it does on the
+       PA's own pages, and the sheet opens in the viewer every other document
+       here opens in. */
+    const paid = kind === 'advice' && typeof previewAdviceFor === 'function'
+      ? submissionFor(name, statusMonth, 'invoice') : null;
+    if (paid && paid.status === 'complete') {
+      const look = button('Preview', 'ghost small', () => previewAdviceFor(paid, null, look));
+      look.setAttribute('aria-label',
+        `Preview the payment advice for ${name}, ${periodOf(paid)}`);
+      look.title = 'Drawn from the approved invoice';
+      acts.appendChild(look);
+    } else {
+      const nothing = document.createElement('span');
+      nothing.className = 'statusnone';
+      nothing.textContent = 'not sent';
+      acts.appendChild(nothing);
+    }
   }
   tr.appendChild(acts);
   return tr;
