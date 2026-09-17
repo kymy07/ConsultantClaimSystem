@@ -193,12 +193,11 @@ async function buildAdvicePDF (S) {
   try {
     const uzma = await loadLogo('uzmaAdvice');
     if (uzma) {
-      /* The template gives the mark a 40.05 x 19.01 box. The artwork is
-         trimmed of its margin before it gets here, so it is fitted to that
-         box rather than stretched into it. */
-      const h = 19.01;
-      const w = Math.min(40.05, uzma.w * (h / uzma.h));
-      doc.addImage(uzma.url, 'PNG', 21.04, 9.23, w, h);
+      /* The artwork arrives trimmed of its margin, so it is placed where the
+         mark itself sits on the sheet — 22.96 to 58.69 across, 10.00 to
+         27.04 down, measured off the template's own image — rather than in
+         the box the untrimmed picture was dropped into. */
+      doc.addImage(uzma.url, 'PNG', 22.96, 10.00, 35.74, 17.03);
     }
   } catch (err) { /* the form prints without it */ }
 
@@ -265,14 +264,15 @@ async function buildAdvicePDF (S) {
   doc.line(cols[3], top + headH, cols[5], top + headH);
 
   const mid = i => (cols[i] + cols[i + 1]) / 2;
+  ink(7.33);
+  at('#', mid(0), 80.4, { align: 'center' });      // the one heading the sheet sets regular
   ink(7.33, 'bold');
-  at('#', mid(0), 80.4, { align: 'center' });
   at('Invoice / Bill Number', mid(1), 78.7, { align: 'center' });
   at('Invoice / Bill Received Date', mid(2), 80.4, { align: 'center' });
   at('PO Number', mid(3), 77.0, { align: 'center' });
   at('(if applicable)', mid(3), 80.35, { align: 'center' });
   at('Project Code', mid(4), 77.0, { align: 'center' });
-  at('(if applicable)', mid(4), 80.35, { align: 'center' });
+  at(' (if applicable)', mid(4), 80.35, { align: 'center' });   // the sheet's own leading space
   at('Amount', mid(5), 80.4, { align: 'center' });
 
   ink(7.33, 'bolditalic');
@@ -303,7 +303,7 @@ async function buildAdvicePDF (S) {
   at('RM' + money(F.amount), 192.36, 118.8, { align: 'right' });
 
   /* ---- other details ---- */
-  band(ADV.bands.other, 'Other Details', '(If applicable)');
+  band(ADV.bands.other, 'Other Details ', '(If applicable)');
 
   ink(7.33);
   at('Details of Payment', labelX, 132.9);
@@ -342,15 +342,17 @@ async function buildAdvicePDF (S) {
 
   ink(7.33);
   at('Cost Category', labelX, 191.4);
+  /* Three of the four labels carry a leading space on the sheet and one
+     does not; the text is the sheet's own, space and all. */
   [
-    ['Cost of Sales', 45.64, 4.66, 50.88],
-    ['Opex', 72.35, 5.71, 78.49],
-    ['Fixed Asset', 88.90, 4.02, 95.72],
-    ['Inventory', 115.40, 4.28, 121.84]
+    ['Cost of Sales', ' Cost of Sales', 45.64, 4.66, 50.88],
+    ['Opex', ' Opex', 72.35, 5.71, 78.49],
+    ['Fixed Asset', 'Fixed Asset', 88.90, 4.02, 95.72],
+    ['Inventory', ' Inventory', 115.40, 4.28, 121.84]
   ].forEach(c => {
-    tick(c[1], 187.28, c[2], 4.85, F.category === c[0]);
+    tick(c[2], 187.28, c[3], 4.85, F.category === c[0]);
     ink(7.33);
-    at(' ' + c[0], c[3], 191.4);
+    at(c[1], c[4], 191.4);
   });
 
   /* ---- the right-hand column: where it is charged, and the tax on it ---- */
@@ -399,10 +401,16 @@ async function buildAdvicePDF (S) {
   /* ---- who prepared it, and who approved it ---- */
   band(ADV.bands.approval, 'Payment Advice Approval');
 
+  /* The dotted rule under each signature runs under the name cell, not
+     from the label, and each is its own length — measured off the sheet,
+     where they are 118 dots of 0.19mm at a 0.34mm pitch. Drawn from the
+     label and given one length, the first ran into the second. */
   const columns = [
-    { title: 'Prepared by :', name: F.preparedName, date: F.preparedDate, sig: (S.sig || {}).pa },
-    { title: 'Reviewed by :', name: '', date: '', note: ' (if required)' },
-    { title: 'Approved by :', name: F.approvedName, date: F.approvedDate, sig: (S.sig || {}).hod }
+    { title: 'Prepared by :', name: F.preparedName, date: F.preparedDate, sig: (S.sig || {}).pa,
+      rule: [32.50, 72.24] },
+    { title: 'Reviewed by :', name: '', date: '', note: ' (if required)', rule: [84.43, 127.72] },
+    { title: 'Approved by :', name: F.approvedName, date: F.approvedDate, sig: (S.sig || {}).hod,
+      rule: [145.62, 193.79] }
   ];
 
   for (let i = 0; i < columns.length; i++) {
@@ -424,10 +432,11 @@ async function buildAdvicePDF (S) {
         }
       } catch (err) { /* the name and the date still stand */ }
     }
-    rule();
-    doc.setLineDashPattern([0.5, 0.5], 0);
-    doc.line(x, 231.0, x + 55, 231.0);
+    doc.setDrawColor(...ADV_INK).setLineWidth(0.315);
+    doc.setLineDashPattern([0.19, 0.15], 0);
+    doc.line(c.rule[0], 230.6, c.rule[1], 230.6);
     doc.setLineDashPattern([], 0);
+    rule();
     ink(7.33);
     at('Name :', x, 234.6);
     at('Date   :', x, 239.9);
