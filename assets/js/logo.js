@@ -22,6 +22,22 @@ const LOGO_SOURCES = {
 
 const logoCache = {};
 
+/* The key this script was loaded under, put on every image it fetches.
+
+   The scripts and the stylesheet carry ?v= so a deploy is picked up on the
+   next load; the images did not, and a changed mark stayed the old mark —
+   in the browser for four hours, and in Cloudflare in front of the server
+   for as long as it liked. Read off this script's own URL, so bumping the
+   key in index.html invalidates the artwork with everything else. */
+const LOGO_KEY = (() => {
+  try {
+    const src = document.currentScript && document.currentScript.src;
+    const m = src && src.match(/[?&]v=([^&#]+)/);
+    return m ? m[1] : '';
+  } catch (e) { return ''; }
+})();
+const withKey = src => (LOGO_KEY ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'v=' + LOGO_KEY : src);
+
 /**
  * Crop the fully-transparent margin off a rasterised logo.
  *
@@ -95,7 +111,7 @@ function loadLogo (key) {
       }
     };
     img.onerror = () => resolve(attempt(i + 1));
-    img.src = src;
+    img.src = withKey(src);
   });
 
   return attempt(0).then(res => {

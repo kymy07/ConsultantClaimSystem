@@ -690,6 +690,7 @@ check('and falls back to the viewer if the tab was blocked',
    a few millimetres from where the paper expects it; these are the numbers
    read off that PDF, and the form is drawn to them. */
 const genadvice = fs.readFileSync(path.join(ROOT, 'assets/js/gen-advice.js'), 'utf8');
+const logojs = fs.readFileSync(path.join(ROOT, 'assets/js/logo.js'), 'utf8');
 check('the payment advice is drawn on Letter, in Calibri metrics',
   /format: 'letter'/.test(genadvice) && /addCarlito\(doc\)/.test(genadvice) &&
   /const ADV_FONT = 'Carlito'/.test(genadvice), true);
@@ -698,10 +699,15 @@ check('to the geometry measured off the office’s own sheet',
   /docCols: \[45\.68, 50\.29, 77\.89, 111\.00, 139\.07, 166\.41, 194\.01\]/.test(genadvice) &&
   /bands: \{ primary: 31\.50, other: 122\.22, approval: 193\.93, finance: 243\.21 \}/
     .test(genadvice), true);
+/* A changed mark stayed the old mark: the images carried no cache key, so
+   the browser kept its copy for four hours and Cloudflare, in front of the
+   server, for as long as it liked. They carry the script's own key now. */
+check('the artwork is fetched under the app’s cache key',
+  /const LOGO_KEY = /.test(logojs) && /img\.src = withKey\(src\)/.test(logojs) &&
+  /document\.currentScript\.src/.test(logojs), true);
 check('with the mark its template prints, not the claim form’s wordmark',
   /loadLogo\('uzmaAdvice'\)/.test(genadvice) &&
-  /uzmaAdvice: \['assets\/img\/logo-uzma-advice\.png'\]/
-    .test(fs.readFileSync(path.join(ROOT, 'assets/js/logo.js'), 'utf8')) &&
+  /uzmaAdvice: \['assets\/img\/logo-uzma-advice\.png'\]/.test(logojs) &&
   fs.existsSync(path.join(ROOT, 'assets/img/logo-uzma-advice.png')), true);
 check('the dialog can be closed, and hides when it is',
   /function closeAdviceEditor/.test(signingjs) &&
