@@ -134,6 +134,16 @@ function periodOf (sub) {
   return `${MON3[Math.max(0, m - 1)]} ${sub.period_year}`;
 }
 
+/**
+ * Which documents the table draws a row for.
+ *
+ * The consultant's two, and for anybody in the office the payment advice
+ * as well. A consultant seeing a row for a form they are not allowed to
+ * read is worse than not seeing it at all: they would ask about it.
+ */
+const kindsOnStatus = () =>
+  (Auth.seesOfficeDocuments() ? KIND_ORDER.concat('advice') : KIND_ORDER.slice());
+
 /** which document a row is, using whatever answered when the list was read */
 function kindOf (sub) {
   return Sync.kindOf(sub) || kindCache.get(sub.id) || 'claim';
@@ -160,7 +170,9 @@ function mustSign (sub) {
 }
 
 /** is the PA's stage even a thing for this document? */
-const hasSignatureStage = sub => kindOf(sub) === 'claim';
+/* Everything but the invoice reaches the PA: the time sheet for the HOD's
+   signature, and the payment advice for both of his and hers. */
+const hasSignatureStage = sub => kindOf(sub) !== 'invoice';
 
 /**
  * Where one approval stage stands for one document.
@@ -404,7 +416,7 @@ function statusTable () {
   let drawn = 0;
 
   everybody().forEach(name => {
-    KIND_ORDER.forEach((kind, i) => {
+    kindsOnStatus().forEach((kind, i) => {
       const sub = submissionFor(name, statusMonth, kind);
       tbody.appendChild(statusRow(name, kind, sub, i === 0));
       drawn++;
@@ -472,16 +484,23 @@ function statusRow (name, kind, sub, first) {
     + (sub && sub.status === 'returned' ? ' back' : '')
     + (sub ? '' : ' unsent');
 
+  /* One name per person, not one per document. The rows under it are the
+     same person's, and repeating the name three times reads as three people.
+     The cell is still there, empty, rather than spanned: an open decision
+     panel puts a full-width row in the middle of somebody's rows, and a
+     spanned cell would have every column after it sliding sideways. */
   const who = document.createElement('td');
-  who.className = 'who';
-  who.dataset.col = 'Consultant';
-  const b = document.createElement('b');
-  b.textContent = name;
-  who.appendChild(b);
-  if (sub && sub.invoice_no) {
-    const no = document.createElement('small');
-    no.textContent = sub.invoice_no;
-    who.appendChild(no);
+  who.className = 'who' + (first ? '' : ' cont');
+  who.dataset.col = first ? 'Consultant' : '';
+  if (first) {
+    const b = document.createElement('b');
+    b.textContent = name;
+    who.appendChild(b);
+    if (sub && sub.invoice_no) {
+      const no = document.createElement('small');
+      no.textContent = sub.invoice_no;
+      who.appendChild(no);
+    }
   }
   tr.appendChild(who);
 
@@ -1186,8 +1205,12 @@ async function reviewSubmission (id) {
     const state = mergeDefaults(sub.data);
     const kind = Sync.kindOf(sub) || kindCache.get(id) || 'claim';
     // read the document that was sent, not the other one
-    const doc = kind === 'invoice' ? await buildInvoicePDF(state) : await buildClaimPDF(state);
-    const base = kind === 'invoice' ? invoiceFileBase(state) : claimFileBase(state);
+    const doc = kind === 'invoice' ? await buildInvoicePDF(state)
+      : kind === 'advice' ? await buildAdvicePDF(state)
+      : await buildClaimPDF(state);
+    const base = kind === 'invoice' ? invoiceFileBase(state)
+      : kind === 'advice' ? adviceFileBase(state)
+      : claimFileBase(state);
     openPdfPreview(
       `${state.consultant.name || 'Claim'} — ${kindLabel(kind)} — ${STATUS_TEXT[sub.status] || sub.status}`,
       `${base}.pdf`, doc);

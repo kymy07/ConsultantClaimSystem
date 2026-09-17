@@ -132,6 +132,12 @@ const approves = r => r === 'manager' || r === 'boss' || r === 'pa' || r === 'ad
    "is this a consultant". */
 const seesEveryone = r => r !== 'consultant';
 
+/* The payment advice is the office's paperwork for paying a bill. It is
+   prepared for the consultant, approved without them, and they never see
+   it — so the question is asked as "is this the office", not "is this the
+   PA", because the administrator and the approvers are the office too. */
+const seesOfficeDocuments = r => !!r && r !== 'consultant';
+
 /* Two numbers belong to the office rather than to the person: the unique ID
    that makes their invoice series, and the count of claims they have sent.
    One person deciding they are 07 is how two people end up both being 07. */
@@ -410,6 +416,7 @@ const Auth = {
   keepsRecords: () => keepsRecords(currentRole()),
   approves: () => approves(currentRole()),
   seesEveryone: () => seesEveryone(currentRole()),
+  seesOfficeDocuments: () => seesOfficeDocuments(currentRole()),
   setsNumbering: () => setsNumbering(currentRole()),
   isAdmin: () => isAdmin(currentRole()),
   /** the signed-in address, lower-cased — '' when signed out */

@@ -108,6 +108,10 @@ const STEPS = [
      too — after everything else. */
   { id: 'todownload', label: 'Download', signs: true },
   { id: 'toupload',   label: 'Upload',   signs: true },
+  /* The office's own form, prepared once the HOD has approved the bill it
+     pays. It goes round for approval like a time sheet and comes back to
+     be signed, so it is work rather than a place to look. */
+  { id: 'advice',     label: 'Payment Advice', signs: true },
   /* Not a step either: the job behind, rather than the job in front. */
   /* Called History for the PA, who has no other: it is where a confirmed
      month lives, under the person's name. The administrator already has a
@@ -192,7 +196,7 @@ function canLeave (id) {
    September should not first be asked to pick a document they are not going
    to produce, and somebody whose invoice was rejected should not have to
    finish a fresh claim before they can read why. */
-const INFO_STEPS = ['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed'];
+const INFO_STEPS = ['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed', 'advice'];
 
 function goToStep (i, skipGuard) {
   const list = activeSteps();
@@ -237,6 +241,7 @@ function showStep () {
   if (step.id === 'resubmit') renderResubmit();
   if (step.id === 'todownload') renderSignDownload();
   if (step.id === 'toupload') renderSignUpload();
+  if (step.id === 'advice') renderAdvice();
   if (step.id === 'filed') renderFiled();
   window.scrollTo({ top: 0, behavior: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
@@ -1330,6 +1335,8 @@ function boot () {
   if (btnDl) btnDl.addEventListener('click', () => renderSignDownload());
   const btnUp = document.getElementById('btnRefreshSignUpload');
   if (btnUp) btnUp.addEventListener('click', () => renderSignUpload());
+  const btnAdvice = document.getElementById('btnRefreshAdvice');
+  if (btnAdvice) btnAdvice.addEventListener('click', () => renderAdvice());
   const btnFiled = document.getElementById('btnRefreshFiled');
   if (btnFiled) btnFiled.addEventListener('click', () => { archiveLoaded = false; renderFiled(); });
   const btnBack = document.getElementById('btnRefreshReturned');

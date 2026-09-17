@@ -861,3 +861,241 @@ async function saveStored (rec, control) {
     if (control) control.disabled = false;
   }
 }
+
+/* -------------------------------------------------------------------
+   Payment Advice — the office's own form
+
+   The consultant's two documents are theirs: they write them and they sign
+   them. This one is Uzma's. It pays an invoice the HOD has already
+   approved, so it cannot exist before that, and it carries nothing the
+   invoice does not already say.
+
+   It travels the road the time sheet travels — the project manager, the
+   HOD, then back here — and the last step is two signatures rather than
+   one: the HOD's, in the box the form calls Approved by, and the PA's own,
+   in the box it calls Prepared by.
+   ------------------------------------------------------------------- */
+
+/** the invoices the HOD has approved, newest month first */
+function invoicesApproved () {
+  return signingSubs
+    .filter(s => s.status === 'complete' && kindOf(s) === 'invoice')
+    .slice()
+    .sort(byMonthThenName);
+}
+
+/** the advice for one person and month, whatever stage it has reached */
+function adviceFor (sub) {
+  const who = String(sub.consultant || '').trim();
+  return signingSubs.filter(s =>
+    kindOf(s) === 'advice' &&
+    String(s.consultant || '').trim() === who &&
+    Number(s.period_year) === Number(sub.period_year) &&
+    Number(s.period_month) === Number(sub.period_month))[0] || null;
+}
+
+/** where one advice has got, in the words the page uses */
+function adviceWords (advice) {
+  if (!advice) return 'Not prepared';
+  if (advice.status === 'complete') return 'Signed and closed';
+  if (advice.status === SIGNING_STATUS) return 'Waiting for your signature';
+  if (advice.status === 'returned') return 'Sent back';
+  return (typeof STATUS_TEXT === 'object' && STATUS_TEXT[advice.status]) || advice.status;
+}
+
+async function renderAdvice () {
+  const host = document.getElementById('adviceList');
+  if (!host) return;
+  if (!(await loadSigning(host, renderAdvice))) return;
+  await learnSigningKinds();
+
+  host.innerHTML = '';
+  const rows = invoicesApproved();
+
+  if (!rows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'emptynote';
+    empty.textContent = 'No approved invoices yet. A payment advice is prepared once the HOD has ' +
+      'approved the invoice it pays, and one appears here for each month that reaches that point.';
+    host.appendChild(empty);
+    return;
+  }
+
+  const count = document.createElement('p');
+  count.className = 'historycount';
+  count.setAttribute('role', 'status');
+  const waiting = rows.filter(sub => {
+    const a = adviceFor(sub);
+    return !a || a.status === SIGNING_STATUS;
+  }).length;
+  count.textContent = waiting
+    ? `${waiting} payment advice${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} you.`
+    : 'Nothing needs you here.';
+  host.appendChild(count);
+
+  signingMonthTables(host, rows, ['Status', 'Payment Advice'], sub => {
+    const advice = adviceFor(sub);
+    const who = `${sub.consultant || 'consultant'}, ${periodOf(sub)}`;
+    const actions = [];
+
+    if (advice) {
+      actions.push(labelledIcon('view', 'View', 'View the payment advice for ' + who,
+                                () => reviewSubmission(advice.id)));
+    }
+
+    const cell = document.createElement('div');
+    cell.className = 'signcell';
+    cell.appendChild(signingDocument(
+      advice ? 'Payment Advice' : 'Not prepared yet',
+      advice ? (advice.invoice_no || sub.invoice_no || '') : 'Prepared from invoice ' + (sub.invoice_no || ''),
+      actions));
+
+    const bar = document.createElement('div');
+    bar.className = 'btnrow';
+    if (!advice) {
+      const go = button('Prepare and send for approval', 'primary small',
+                        () => prepareAdvice(sub, go));
+      bar.appendChild(go);
+    } else if (advice.status === SIGNING_STATUS) {
+      const go = button('Sign and close', 'primary small', () => openAdviceSigning(advice, sub));
+      bar.appendChild(go);
+    }
+    if (bar.children.length) cell.appendChild(bar);
+
+    return [statusBadge(adviceWords(advice)), cell];
+  }, {
+    roster: [],
+    fallbackMonth: currentSigningMonth(),
+    missing: () => [statusBadge('Not prepared'), emptyCell()]
+  });
+}
+
+/**
+ * Prepare one, and send it round.
+ *
+ * Everything it says comes from the invoice it pays, so the form is built
+ * from that claim's own stored state rather than from anything typed here.
+ * The dates are the only thing this adds, and they are today's, because
+ * today is when it was prepared.
+ */
+async function prepareAdvice (sub, go) {
+  if (signingBusy) return;
+  const who = `${sub.consultant || 'somebody'} \u00b7 ${periodOf(sub)}`;
+  if (!confirm(`Prepare the payment advice for ${who}?\n\n` +
+               'It is built from the approved invoice and goes to the project manager, then the ' +
+               'HOD, then back here to be signed.')) return;
+
+  signingBusy = true;
+  const was = go.textContent;
+  go.disabled = true;
+  go.textContent = 'Preparing…';
+  try {
+    const full = await Sync.submission(sub.id);
+    if (!full || !full.data) throw new Error('That invoice could not be read.');
+    const state = mergeDefaults(full.data);
+    const today = new Date().toISOString().slice(0, 10);
+    state.advice = Object.assign({}, state.advice, {
+      receivedDate: today,
+      preparedDate: today,
+      preparedName: (Auth.personFor('pa') || ''),
+      approvedName: (Auth.personFor('boss') || '')
+    });
+    await Sync.submit(state, 'Payment advice for ' + periodOf(sub), 'advice');
+    toast('Payment advice sent to the project manager.');
+    await renderAdvice();
+  } catch (err) {
+    toast(err.message || 'Could not prepare it.', true);
+    go.disabled = false;
+    go.textContent = was;
+  } finally {
+    signingBusy = false;
+  }
+}
+
+/**
+ * The last step: two signatures on one form.
+ *
+ * The HOD approved this advice, and his signature is placed here the way it
+ * is placed on a time sheet — by the PA, who holds it. Hers goes in the box
+ * the form calls Prepared by, because she is the one who prepared it.
+ */
+function openAdviceSigning (advice, invoice) {
+  const host = document.getElementById('adviceList');
+  if (!host || document.getElementById('adviceSign')) return;
+
+  const box = document.createElement('div');
+  box.id = 'adviceSign';
+  box.className = 'decidebox';
+
+  const head = document.createElement('p');
+  head.className = 'decidehead';
+  head.textContent = 'Sign the payment advice';
+  box.appendChild(head);
+
+  const context = document.createElement('p');
+  context.className = 'status-context';
+  context.textContent = `${advice.consultant || ''} \u00b7 ${periodOf(advice)}`;
+  box.appendChild(context);
+
+  const pads = [
+    { key: 'hod', title: 'The HOD\u2019s signature, for Approved by', value: myLastSignature() },
+    { key: 'pa', title: 'Your own signature, for Prepared by', value: myLastSignature() }
+  ];
+  pads.forEach(pad => {
+    const label = document.createElement('p');
+    label.className = 'fieldlabel';
+    label.textContent = pad.title;
+    box.appendChild(label);
+    const padHost = document.createElement('div');
+    padHost.className = 'decidepad sigprofile';
+    box.appendChild(padHost);
+    mountSignaturePicker(padHost, { get: () => pad.value, set: url => { pad.value = url; } });
+  });
+
+  const bar = document.createElement('div');
+  bar.className = 'btnrow';
+  const go = button('Sign and close the advice', 'primary',
+                    () => signAdvice(advice, pads, go));
+  bar.appendChild(go);
+  bar.appendChild(button('Cancel', 'ghost', () => box.remove()));
+  box.appendChild(bar);
+  host.appendChild(box);
+  box.scrollIntoView({ block: 'nearest' });
+}
+
+async function signAdvice (advice, pads, go) {
+  if (signingBusy) return;
+  const missing = pads.filter(p => !p.value);
+  if (missing.length) {
+    toast('Both signatures are needed: the HOD\u2019s and your own.', true);
+    return;
+  }
+
+  signingBusy = true;
+  const was = go.textContent;
+  go.disabled = true;
+  go.textContent = 'Signing…';
+  try {
+    const full = await Sync.submission(advice.id);
+    const state = mergeDefaults((full && full.data) || {});
+    const today = new Date().toISOString().slice(0, 10);
+    state.sig = state.sig || {};
+    pads.forEach(p => { state.sig[p.key] = p.value; });
+    state.advice = Object.assign({}, state.advice, {
+      approvedDate: state.advice && state.advice.approvedDate ? state.advice.approvedDate : today,
+      preparedDate: state.advice && state.advice.preparedDate ? state.advice.preparedDate : today
+    });
+    rememberSignature(pads[0].value);
+    await Sync.act(advice.id, 'approve', '', state);
+    const box = document.getElementById('adviceSign');
+    if (box) box.remove();
+    toast('Signed. That month is closed.');
+    await renderAdvice();
+  } catch (err) {
+    toast(err.message || 'Could not sign it.', true);
+    go.disabled = false;
+    go.textContent = was;
+  } finally {
+    signingBusy = false;
+  }
+}

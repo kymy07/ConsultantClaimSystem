@@ -523,8 +523,12 @@ function invoiceTotals (S, items) {
    with one and not the other, so each goes for approval on its own and
    carries its own status the whole way. */
 const SUBMIT_KINDS = {
-  claim:   { label: 'Time sheet', short: 'CLAIM', mode: 'claim' },
-  invoice: { label: 'Invoice',    short: 'INV',   mode: 'invoice' }
+  claim:   { label: 'Time sheet',     short: 'CLAIM', mode: 'claim' },
+  invoice: { label: 'Invoice',        short: 'INV',   mode: 'invoice' },
+  /* The office's own form, prepared for the consultant rather than by them.
+     It carries no `mode`: nobody chooses it on the Document step, because it
+     is not theirs to produce and never theirs to read. */
+  advice:  { label: 'Payment Advice', short: 'PA',    office: true }
 };
 
 /* The time sheet comes first, everywhere. It is the evidence, and the invoice

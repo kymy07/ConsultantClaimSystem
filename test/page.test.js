@@ -254,7 +254,7 @@ check('and approving is a capability too',
 // asked an administrator opening the app to see whether Amila had sent
 // September to choose a document they were never going to produce.
 check('a reporting step is not gated behind the form',
-  /const INFO_STEPS = \['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed'\]/.test(appjs) &&
+  /const INFO_STEPS = \['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed', 'advice'\]/.test(appjs) &&
   /!skipGuard && !reporting/.test(appjs), true);
 check('the stage headings name who does the stage',
   /Auth\.personFor\(st\.who\)/.test(approvals), true);
@@ -612,8 +612,42 @@ check('the first paint waits for the database rather than calling it absent',
    ----------------------------------------------------------------------- */
 console.log('\nWhat the PA actually signs');
 
+/* -----------------------------------------------------------------------
+   The Payment Advice. Uzma's own form for paying an approved invoice:
+   prepared by the PA, approved by the project manager and the HOD, signed
+   by the PA in both boxes, and never seen by the consultant.
+   ----------------------------------------------------------------------- */
+console.log('\nThe Payment Advice');
+
+const genadvice = fs.readFileSync(path.join(ROOT, 'assets/js/gen-advice.js'), 'utf8');
+check('the form is drawn to the template it copies',
+  /function buildAdvicePDF/.test(genadvice) &&
+  /UZMA-FA01-IMS-OS01 \(F01\)/.test(genadvice), true);
+check('and nothing on it is retyped',
+  /invoiceNo: S\.invoice\.no/.test(genadvice) &&
+  /amount: adviceAmount\(S\)/.test(genadvice) &&
+  /Payment for Consultancy Service Fee- \$\{adviceMonth\(S\)\}/.test(genadvice), true);
+check('it is a document a month can carry',
+  /advice:  \{ label: 'Payment Advice'/.test(statejs), true);
+check('the office sees it and the consultant does not',
+  /const seesOfficeDocuments = r => !!r && r !== 'consultant'/.test(authjs) &&
+  /Auth\.seesOfficeDocuments\(\) \? KIND_ORDER\.concat\('advice'\)/.test(approvals), true);
+check('the PA prepares it from the approved invoice',
+  /async function prepareAdvice/.test(signingjs) &&
+  /Sync\.submit\(state, 'Payment advice for '/.test(signingjs), true);
+check('and signs it twice: the HOD’s box and her own',
+  /key: 'hod'/.test(signingjs) && /key: 'pa'/.test(signingjs) &&
+  /async function signAdvice/.test(signingjs), true);
+/* One name per person, not one per document: the rows under it are the same
+   person's, and repeating the name three times reads as three people. */
+check('the status table names each person once',
+  /who' \+ \(first \? '' : ' cont'\)/.test(approvals), true);
+
+/* The time sheet reaches the PA for the HOD's signature, and the payment
+   advice reaches her for both his and her own. The invoice reaches nobody
+   there: it carries one signature, the consultant's, already on it. */
 check('an invoice has no signature stage',
-  /const hasSignatureStage = sub => kindOf\(sub\) === 'claim'/.test(approvals), true);
+  /const hasSignatureStage = sub => kindOf\(sub\) !== 'invoice'/.test(approvals), true);
 check('so it never lands in the PA queue',
   /pending_signature' && !hasSignatureStage\(sub\)\) return Auth\.isAdmin\(\)/.test(approvals), true);
 check('and the column says so rather than waiting for ever',
