@@ -7,7 +7,7 @@ class Element {
   setAttribute(k,v) { this.attrs[k] = v; }
   removeAttribute(k) { delete this.attrs[k]; }
 }
-let saved = 0, viewed = 0, errors = 0, adminNow = false;
+let saved = 0, viewed = 0, errors = 0, adminNow = false, sendsNow = false;
 const ctx = vm.createContext({
   document: { createElement: tag => new Element(tag) },
   MONTHS: ['January'], Blob,
@@ -17,12 +17,15 @@ const ctx = vm.createContext({
     {icon:name, title:label, className:cls, handler}),
   Sync: { storedOne: async () => ({files:[{name:'signed.pdf',type:'application/pdf',content:'YQ=='}]}) },
   dataUrlToBytes: () => new Uint8Array([97]),
-  // only the administrator may take a filed copy off the record
-  Auth: { isAdmin: () => adminNow },
+  /* Only the administrator may take a filed copy off the record, and only
+     whoever sends a month to Finance gets the buttons that compile it — a
+     consultant reading their own history has neither. */
+  Auth: { isAdmin: () => adminNow, keepsRecords: () => sendsNow, places: () => false },
   openFilePreview: () => viewed++, saveAs: () => saved++, toast: () => errors++
 });
 vm.runInContext(fs.readFileSync('assets/js/archive.js','utf8'),ctx);
 const record = {id:1,consultant:'Person <A>',period_month:1,period_year:2026,kind:'claim',files:[{name:'signed.pdf'}]};
+sendsNow = true;                      // the month's own buttons, for whoever sends it on
 const wrap = ctx.historyTable([record,{...record,id:2,kind:'invoice'}]);
 // everybody on the roster gets a line, even with nothing filed
 const full = ctx.historyTable([record],['Zulkifli','Person <A>']);
@@ -40,6 +43,13 @@ const monthbar = wrap.children[0];
 assert.equal(monthbar.className,'history-monthbar');
 assert.equal(monthbar.children[0].children[0].textContent,'Compile month zip');
 assert.equal(monthbar.children[1].children[0].textContent,'Email Finance');
+/* And a consultant, who has nothing to compile and nobody to send it to,
+   gets the table without them — the first child is the table itself. */
+sendsNow = false;
+const readOnly = ctx.historyTable([record]);
+assert.equal(readOnly.children.length,1);
+assert.equal(readOnly.children[0].tag,'table');
+sendsNow = true;
 const missing = ctx.historyTable([record]).children[1].children[2].children[0].children[2];
 assert.equal(missing.children[0].textContent,'Not available');
 // every document that is there says what it is called

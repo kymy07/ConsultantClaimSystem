@@ -135,9 +135,16 @@ function archiveBy (consultant, year, month, kind, stage) {
   return (rec.created_by || 'somebody') + (when ? ' on ' + when : '');
 }
 
-/** may the account that is signed in put documents on file? */
+/**
+ * May the account that is signed in put documents on file?
+ *
+ * The signed paper never passes through the consultant's hands: they send
+ * the form, the project manager and the HOD sign it, and the PA files what
+ * comes back. Offering them the box asked them to do somebody else's job
+ * with paper they do not have.
+ */
 function canFileSigned () {
-  return !Auth.role() || Auth.prepares() || Auth.places();
+  return Auth.places();
 }
 
 /**
@@ -213,13 +220,19 @@ async function renderHistory (force) {
      whoever collects the forms it is the whole job, and the only screen they
      have — so it is named for what they came to do. */
   const collecting = Auth.keepsRecords() && !Auth.approves();
+  const mine = !Auth.keepsRecords() && !Auth.approves() && !Auth.places();
   const head = document.getElementById('historyHead');
   const lead = document.getElementById('historyLead');
   if (head) head.textContent = collecting ? 'Documents to collect' : 'History';
   if (lead) {
+    /* A consultant's history is their own: the database hands them their
+       own records and nobody else's, and the page should say so rather
+       than let them wonder whose are missing. */
     lead.textContent = collecting
       ? 'Filter signed documents, then view or download them as one ZIP.'
-      : 'Find signed documents by consultant and year.';
+      : mine
+        ? 'Your own signed documents, by year. Nobody else can be seen here, and nothing here can be changed.'
+        : 'Find signed documents by consultant and year.';
   }
 
   if (!Sync.on) {
@@ -383,7 +396,11 @@ function historyTable (records, roster) {
   /* The month is what Finance is sent, and it is one file: a folder per
      person, three documents in each, everybody at once. So the two buttons
      are the month's, on its heading, and not a row's. The people are read
-     at click time, after the map below is built. */
+     at click time, after the map below is built.
+
+     Only for whoever sends it. A consultant reading their own record has
+     nothing to compile and nobody to send it to. */
+  const sends = typeof Auth !== 'undefined' && (Auth.keepsRecords() || Auth.places());
   const bar = document.createElement('div');
   bar.className = 'history-monthbar';
   const when = { period_year: first.period_year, period_month: first.period_month };
@@ -396,7 +413,7 @@ function historyTable (records, roster) {
     'ghost small history-icon', control => sendMonthToFinance(when, everyone(), control));
   const mailWord = document.createElement('span'); mailWord.textContent = 'Email Finance';
   mail.appendChild(mailWord); bar.appendChild(mail);
-  wrap.appendChild(bar);
+  if (sends) wrap.appendChild(bar);
   const head = document.createElement('thead');
   const titles = document.createElement('tr');
   ['Consultant', 'Time Sheet', 'Invoice', 'Payment Advice'].forEach(label => {

@@ -865,6 +865,19 @@ check('the administrator compiles a month into one zip, everybody at once',
    that has one, are the slip. The two point in opposite directions, and the
    button on the row does the one thing the case calls for — for the
    administrator and the PA, who keep the record. */
+/* The signed paper never passes through the consultant's hands: they send
+   the form, the approvers sign it, the PA files what comes back. */
+check('only the PA files signed copies',
+  /function canFileSigned \(\) \{[\s\S]{0,40}return Auth\.places\(\);/.test(archivejs), true);
+/* And a consultant can read their own part of the record. The database
+   hands them their own records and nobody else's, so the step is the same
+   step; what differs is what comes back, and what can be done with it. */
+check('a consultant can read their own history, and only read it',
+  /reads: true/.test(appjs) &&
+  /\(!s\.records \|\| Auth\.keepsRecords\(\) \|\| \(s\.reads && Auth\.prepares\(\)\)\)/.test(appjs) &&
+  /const sends = typeof Auth !== 'undefined' && \(Auth\.keepsRecords\(\) \|\| Auth\.places\(\)\);/.test(archivejs) &&
+  /if \(sends\) wrap\.appendChild\(bar\);/.test(archivejs) &&
+  /Nobody else can be seen here/.test(archivejs), true);
 check('a duplicate is pointed out to everybody, and the slip is the one without the person',
   /function duplicateCase/.test(signingjs) &&
   /if \(profileUnder\(name\) && here\.total === 0 && profileUnder\(other\) && filedUnder\(other\)\.total > 0\)/.test(signingjs) &&

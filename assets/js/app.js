@@ -113,7 +113,11 @@ const STEPS = [
      for everybody else. */
   /* The whole record, for the two accounts whose job it is: the
      administrator, and whoever keeps the finished paper. */
-  { id: 'history',    label: 'History', records: true, view: true },
+  /* The administrator keeps the record; a consultant reads their own part
+     of it, which the database narrows to them. Both land on the same step
+     — it is the same question, "what went, and when" — and what differs is
+     what it hands back. */
+  { id: 'history',    label: 'History', records: true, reads: true, view: true },
   /* The PA's three pages, in the order the job happens: print what is
      waiting, write the payment advice for it, then file both back signed.
      The admin stands in everywhere, so the admin gets them too — after
@@ -145,7 +149,7 @@ const stepLabel = s => (s.labelFor ? s.labelFor() : s.label);
 
 /** steps this account is allowed to see at all, right now */
 const permittedSteps = () => STEPS.filter(s =>
-  (!s.records || Auth.keepsRecords()) &&
+  (!s.records || Auth.keepsRecords() || (s.reads && Auth.prepares())) &&
   (!s.signs || Auth.places()) &&
   (!s.whenReturned || (typeof returnedCount === 'function' && returnedCount() > 0)));
 
