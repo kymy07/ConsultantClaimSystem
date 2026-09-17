@@ -624,6 +624,13 @@ const tsjs = fs.readFileSync(path.join(ROOT, 'assets/js/timesheet.js'), 'utf8');
 /* A dash is how the paper sheet writes a day that is nobody's — a weekend,
    mostly. It prints, and it says the day was looked at; it does not change
    what the day is worth: a dashed Saturday is still the paid weekend. */
+/* One dash on the grid, not two. The blank placeholder was an en dash, a
+   different character from the one somebody puts on a day on purpose and
+   all but identical on screen — two marks that looked alike and meant
+   opposite things, one warned about and one not. */
+check('an unmarked day shows nothing, so the only dash is the one somebody put there',
+  /button\.textContent = manual \|\| shown \|\| '';/.test(tsjs) &&
+  !/–/.test(tsjs), true);
 check('a day can be dashed, as the paper sheet does',
   /const CYCLE = \['', '\/', 'PH', 'PTO', 'MC', 'UL', '-'\]/.test(tsjs) &&
   /not a working day/.test(html), true);

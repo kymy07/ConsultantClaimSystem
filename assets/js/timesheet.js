@@ -276,7 +276,12 @@ function paintDay (td, ts, act, d) {
         : shown === 'SAT' ? 'Saturday' : shown === 'SUN' ? 'Sunday' : 'unmarked');
   const label = `${d} ${MONTHS[ts.month]} ${ts.year}: ${what}`;
   if (button) {
-    button.textContent = manual || shown || '–';
+    /* An unmarked day shows nothing. It used to show an en dash, which is
+       a different character from the dash somebody puts on a day on
+       purpose and all but identical on screen — two marks that looked
+       alike and meant opposite things, one warned about and one not.
+       The cell is a 44px target either way. */
+    button.textContent = manual || shown || '';
     button.setAttribute('aria-label', `${act.name || 'Activity ' + (Number(button.dataset.activity) + 1)}, ${label}. Activate to change.`);
     button.title = label + ' — select to change';
   }
