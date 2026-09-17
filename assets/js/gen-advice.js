@@ -197,7 +197,11 @@ async function buildAdvicePDF (S) {
          mark itself sits on the sheet — 22.96 to 58.69 across, 10.00 to
          27.04 down, measured off the template's own image — rather than in
          the box the untrimmed picture was dropped into. */
-      doc.addImage(uzma.url, 'PNG', 22.96, 10.00, 35.74, 17.03);
+      /* Deflated, or jsPDF writes the image stream raw: at the resolution
+         the mark is kept for print, that raw stream is fifteen megabytes on
+         a form that is otherwise sixty kilobytes. Flat two-colour art packs
+         down to almost nothing. */
+      doc.addImage(uzma.url, 'PNG', 22.96, 10.00, 35.74, 17.03, undefined, 'SLOW');
     }
   } catch (err) { /* the form prints without it */ }
 
