@@ -628,6 +628,13 @@ function invoiceNumberOf (S) {
 
 const STORE_KEY   = 'ccs.current';
 const PROFILE_KEY = 'ccs.profiles';
+/* Deleting a profile has to be remembered, not only done. Every browser keeps
+   its own copy of the list, so without a note of what was deleted on purpose
+   the next sync puts it straight back and the name appears twice again. */
+const BURIED_KEY  = 'ccs.profiles.deleted';
+/* And a profile saved while BDOS was unreachable has to be remembered too,
+   so that it, and only it, is sent up when the connection comes back. */
+const UNSENT_KEY  = 'ccs.profiles.unsent';
 
 const Store = {
   saveCurrent (S) {
@@ -639,9 +646,39 @@ const Store = {
     try {
       localStorage.removeItem(STORE_KEY);
       localStorage.removeItem(PROFILE_KEY);
+      localStorage.removeItem(BURIED_KEY);
+      localStorage.removeItem(UNSENT_KEY);
       return true;
     } catch (e) { return false; }
   },
+
+  /** a list of names kept under one key, read defensively */
+  nameList (key) {
+    try {
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(list) ? list.map(String) : [];
+    } catch (e) { return []; }
+  },
+  putNameList (key, list) {
+    try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) { /* ignore */ }
+  },
+  addName (key, name) {
+    const list = Store.nameList(key);
+    if (list.indexOf(String(name)) === -1) list.push(String(name));
+    Store.putNameList(key, list);
+  },
+  dropName (key, name) {
+    Store.putNameList(key, Store.nameList(key).filter(n => n !== String(name)));
+  },
+
+  /** the profile names deleted here on purpose, which must not come back */
+  buried: () => Store.nameList(BURIED_KEY),
+  isBuried: name => Store.nameList(BURIED_KEY).indexOf(String(name)) !== -1,
+
+  /** profiles saved here that BDOS has not taken yet */
+  unsent: () => Store.nameList(UNSENT_KEY),
+  markUnsent: name => Store.addName(UNSENT_KEY, name),
+  markSent: name => Store.dropName(UNSENT_KEY, name),
   loadCurrent () {
     try {
       const raw = localStorage.getItem(STORE_KEY);
@@ -655,12 +692,15 @@ const Store = {
   saveProfile (name, S) {
     const p = Store.profiles();
     p[name] = JSON.parse(JSON.stringify(S));
+    Store.dropName(BURIED_KEY, name);       // saving it again is meaning it
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); return true; } catch (e) { return false; }
   },
   deleteProfile (name) {
     const p = Store.profiles();
     delete p[name];
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ }
+    Store.addName(BURIED_KEY, name);
+    Store.markSent(name);
   }
 };
 

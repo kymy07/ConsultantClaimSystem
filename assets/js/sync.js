@@ -134,15 +134,17 @@ async function pullProfiles () {
 }
 
 async function pushProfile (name, S) {
-  if (!syncOn) return;
+  if (!syncOn) { Store.markUnsent(name); return; }
   try {
     const body = await ccsFetch('/profiles', {
       method: 'POST',
       body: JSON.stringify({ name: name, data: S })
     });
     if (body && body.profile) profileIds.set(body.profile.name, body.profile.id);
+    Store.markSent(name);
   } catch (err) {
     if (err.status === 404 || err.status === 403) syncOn = false;
+    Store.markUnsent(name);
     console.warn(err.message || err);
   }
 }
@@ -162,27 +164,43 @@ async function deleteProfile (name) {
 
 /**
  * Reconcile the shared profile list with this browser's copy.
- * A name on one side and not the other is a profile somebody saved; both
- * survive. A name on both sides keeps the copy already in this browser,
- * which is the one whose owner is sitting here.
+ *
+ * A name on the shared list and not here is copied down. A name on both keeps
+ * the copy already in this browser, which is the one whose owner is sitting
+ * here.
+ *
+ * What goes up is only what was saved here and never accepted \u2014 not
+ * everything this browser happens to hold. That distinction is the whole
+ * reason a deleted profile used to come back: every browser still holding an
+ * old copy would see a name the shared list was missing and helpfully send it
+ * again. A copy that merely arrived here from somebody else is not this
+ * browser's to republish, and a name deleted here on purpose is nobody's.
  */
 async function mergeProfiles () {
   const remote = await pullProfiles();
   const local  = Store.profiles();
   let gained = 0;
+  let removed = 0;
 
-  remote.forEach(p => {
+  for (const p of remote) {
+    if (Store.isBuried(p.name)) {
+      Store.deleteProfile(p.name);            // in case a copy slipped back in
+      await deleteProfile(p.name);            // and take it off the shared list
+      removed++;
+      continue;
+    }
     if (local[p.name] === undefined && p.data) {
       Store.saveProfile(p.name, mergeDefaults(p.data));
       gained++;
     }
-  });
+  }
 
   const known = new Set(remote.map(p => p.name));
-  const toPush = Object.keys(local).filter(n => !known.has(n));
-  for (const name of toPush) await pushProfile(name, local[name]);
+  const waiting = Store.unsent().filter(n =>
+    local[n] !== undefined && !known.has(n) && !Store.isBuried(n));
+  for (const name of waiting) await pushProfile(name, local[name]);
 
-  return { gained: gained, sent: toPush.length };
+  return { gained: gained, sent: waiting.length, removed: removed };
 }
 
 /* -----------------------------------------------------------------------
@@ -454,10 +472,10 @@ async function actOnSubmission (id, action, note, data) {
  * @param {object}   S        the state the app just loaded from localStorage
  * @param {function} adopt    called with a state object to load, if the
  *                            database is holding newer work than this browser
- * @returns {Promise<object>} { on, adopted, gained, sent }
+ * @returns {Promise<object>} { on, adopted, gained, sent, removed }
  */
 async function initSync (S, adopt) {
-  const result = { on: false, adopted: false, gained: 0, sent: 0 };
+  const result = { on: false, adopted: false, gained: 0, sent: 0, removed: 0 };
   probed = true;
   if (!Auth.token()) return result;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return result;
@@ -515,6 +533,7 @@ async function initSync (S, adopt) {
     const merged = await mergeProfiles();
     result.gained = merged.gained;
     result.sent = merged.sent;
+    result.removed = merged.removed;
   } catch (err) { console.warn(err.message || err); }
 
   return result;

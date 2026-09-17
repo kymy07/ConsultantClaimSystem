@@ -7,7 +7,7 @@
      · when the /ccs endpoints are not there, syncing switches itself off
        and the app is left exactly as it was
      · a draft is only adopted when doing so cannot lose work
-     · profiles converge in both directions
+     · profiles converge in both directions, and a deleted one stays deleted
      · a claim is recorded in the shape docs/BDOS-CCS-Endpoints.md promises
 
    No real network call is made.
@@ -177,17 +177,51 @@ const adopting = () => {
     'GET /ccs/profiles': { status: 200, body: { profiles: [{ id: 7, name: 'Hanis', data: theirs }] } },
     'POST /ccs/profiles': { status: 200, body: { profile: { id: 8, name: 'Mine', data: {} } } }
   });
-  run(`Store.saveProfile('Mine', defaultState())`);      // only in this browser
+  /* saved here while BDOS was unreachable, so it is still owed to the
+     shared list — that, and not merely being here, is what sends it up */
+  run(`Store.saveProfile('Mine', defaultState()); Store.markUnsent('Mine')`);
   ctx.S = run('defaultState()');
   box = adopting();
   r = await run('Sync.init(S, adopt)');
   check('the shared profile arrives',   r.gained, 1);
   check('it is saved locally',          run(`Store.profiles()['Hanis'].consultant.name`), 'Hanis');
-  check('the local-only one is sent up', r.sent, 1);
+  check('the one BDOS never took is sent up', r.sent, 1);
+  check('and is not owed twice',        run(`Store.unsent().length`), 0);
   check('a null draft changes nothing', r.adopted, false);
 
   const post = sent.find(x => x.method === 'POST' && x.path === '/ccs/profiles');
   check('the upload is keyed by name', post.body.name, 'Mine');
+
+  /* A copy that merely arrived here from somebody else is not this browser's
+     to republish. Republishing is how the same person used to appear twice:
+     one machine deletes the profile, the next sync puts it back. */
+  console.log('\nA deleted profile stays deleted');
+  reset({
+    'GET /ccs/draft':    { status: 200, body: { draft: null } },
+    'GET /ccs/profiles': { status: 200, body: { profiles: [] } }
+  });
+  run(`Store.saveProfile('Someone Else', defaultState())`);
+  ctx.S = run('defaultState()');
+  box = adopting();
+  r = await run('Sync.init(S, adopt)');
+  check('a copy from elsewhere is not republished', r.sent, 0);
+
+  reset({
+    'GET /ccs/draft':    { status: 200, body: { draft: null } },
+    'GET /ccs/profiles': { status: 200, body: { profiles: [{ id: 9, name: 'Gone', data: theirs }] } },
+    'DELETE /ccs/profiles/9': { status: 200, body: { ok: true } }
+  });
+  run(`Store.saveProfile('Gone', defaultState()); Store.deleteProfile('Gone')`);
+  check('the deletion is remembered', run(`Store.isBuried('Gone')`), true);
+  ctx.S = run('defaultState()');
+  box = adopting();
+  r = await run('Sync.init(S, adopt)');
+  check('it does not come back down',  run(`Store.profiles()['Gone'] === undefined`), true);
+  check('and it is taken off the shared list', r.removed, 1);
+  check('by the endpoint that removes it',
+    !!sent.find(x => x.method === 'DELETE' && x.path === '/ccs/profiles/9'), true);
+  run(`Store.saveProfile('Gone', defaultState())`);
+  check('saving it again is meaning it', run(`Store.isBuried('Gone')`), false);
 
   console.log('\nRecording a claim');
   reset({
