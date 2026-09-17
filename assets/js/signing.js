@@ -819,6 +819,13 @@ function filedTable (pairs) {
     downloadLabel.textContent = 'Download';
     download.appendChild(downloadLabel);
     acts.appendChild(download);
+    /* The month itself, rather than the one document this row is about. */
+    const whole = iconButton('download', 'Download all three documents for ' + label + ' as one zip',
+      'ghost small history-icon', control => downloadMonthZip(rec, control));
+    const wholeLabel = document.createElement('span');
+    wholeLabel.textContent = 'Month zip';
+    whole.appendChild(wholeLabel);
+    acts.appendChild(whole);
     item.appendChild(acts);
     copy.appendChild(item);
     row.appendChild(copy);
@@ -1097,5 +1104,101 @@ async function signAdvice (advice, pads, go) {
     go.textContent = was;
   } finally {
     signingBusy = false;
+  }
+}
+
+/* -------------------------------------------------------------------
+   A month, as one file
+
+   A finished month is three documents: the time sheet that was signed on
+   paper and scanned back, the invoice it justifies, and the payment advice
+   that pays it. They were produced at different times by different people,
+   and anybody asked for "September" wants all three.
+
+   So they are gathered into one archive rather than merged into one
+   document. A zip keeps each of them the file it already is — the scan
+   stays the scan, and the two forms stay text somebody can search — which
+   merging them into a single PDF would cost.
+   ------------------------------------------------------------------- */
+
+/** the submission of one kind for the person and month a filed copy is for */
+function monthSubmission (rec, kind) {
+  const who = String(rec.consultant || '').trim();
+  return signingSubs.filter(s =>
+    kindOf(s) === kind &&
+    String(s.consultant || '').trim() === who &&
+    Number(s.period_year) === Number(rec.period_year) &&
+    Number(s.period_month) === Number(rec.period_month))[0] || null;
+}
+
+/** one submission's form, drawn as the document it is */
+async function monthDocument (sub) {
+  const full = await Sync.submission(sub.id);
+  if (!full || !full.data) throw new Error('That document could not be read.');
+  const state = mergeDefaults(full.data);
+  const kind = kindOf(sub);
+  const doc = kind === 'invoice' ? await buildInvoicePDF(state)
+    : kind === 'advice' ? await buildAdvicePDF(state)
+    : await buildClaimPDF(state);
+  const base = kind === 'invoice' ? invoiceFileBase(state)
+    : kind === 'advice' ? adviceFileBase(state)
+    : claimFileBase(state);
+  return { name: base + '.pdf', bytes: new Uint8Array(doc.output('arraybuffer')) };
+}
+
+/**
+ * Everything for one person and one month, in one zip.
+ *
+ * What is missing is said rather than quietly left out: a month with no
+ * payment advice yet produces a zip of two files and a line saying which
+ * one is not there, because a folder that is quietly short a document is
+ * how somebody finds out a year later.
+ */
+async function downloadMonthZip (rec, control) {
+  if (signingBusy) return;
+  signingBusy = true;
+  if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
+  const files = [];
+  const missing = [];
+  try {
+    // the signed time sheet, as it came back on paper
+    try {
+      const stored = await Sync.storedOne(rec.id);
+      const f = stored && (stored.files || [])[0];
+      if (f && f.content) {
+        const type = f.type || 'application/pdf';
+        files.push({ name: archiveFileName(rec, f),
+                     bytes: dataUrlToBytes('data:' + type + ';base64,' + f.content) });
+      } else {
+        missing.push('the signed time sheet');
+      }
+    } catch (err) {
+      missing.push('the signed time sheet');
+    }
+
+    // and the two forms the office produced, drawn from what was approved
+    for (const [kind, what] of [['invoice', 'the invoice'], ['advice', 'the payment advice']]) {
+      const sub = monthSubmission(rec, kind);
+      if (!sub) { missing.push(what); continue; }
+      try {
+        files.push(await monthDocument(sub));
+      } catch (err) {
+        missing.push(what);
+      }
+    }
+
+    if (!files.length) {
+      toast('Nothing could be gathered for that month.', true);
+      return;
+    }
+    const m = Number(rec.period_month) || 0;
+    const when = `${MONTHS[Math.max(0, m - 1)]} ${rec.period_year || ''}`.trim();
+    saveAs(zipFiles(files), safeFile(`${when} - ${rec.consultant || 'Consultant'}`) + '.zip');
+    toast(missing.length
+      ? `${files.length} of 3 saved. Not in it: ${missing.join(', ')}.`
+      : 'All three documents saved as one zip.', !!missing.length);
+  } finally {
+    signingBusy = false;
+    if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
   }
 }
