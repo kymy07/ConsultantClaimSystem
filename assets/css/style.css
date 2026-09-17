@@ -850,6 +850,13 @@ body.locked > .sitefoot{display:none}
 .signstatus.missing{background:#f3f4f6;color:var(--muted)}
 .signstatus.done{background:#e7f5ee;color:var(--ok)}
 .signrow-quiet th{color:var(--muted);font-weight:600}
+/* one person, more than one document: the name is written on the first
+   line and the lines under it run without it */
+.signwho{font-weight:600}
+.signwho.cont{border-top:none}
+.signingtable tr.signrow-under th,
+.signingtable tr.signrow-under td{border-top:none;padding-top:0}
+.signdoc-quiet .history-document-name{color:var(--muted);font-weight:600}
 /* a scan put on a card and not yet sent: named, so it can be checked */
 .signready{
   flex:1 1 220px;min-width:0;font-size:12.5px;font-weight:600;color:var(--navy);

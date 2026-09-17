@@ -126,8 +126,17 @@ async function learnSigningKinds () {
 
 /**
  * Draw rows as one collect-list table per month.
+ *
  * @param {string[]} columns  the document columns after Consultant
  * @param {function} cells    sub -> one element per column
+ * @param {object} options
+ *   roster        everybody to list, whether or not they have a row
+ *   fallbackMonth the month to draw when nothing is waiting
+ *   missing       (name, month) -> cells, for somebody with no row
+ *   lines         (name, sub, month) -> an array of cell-arrays, one per
+ *                 line. A month is two documents for the PA, and the name
+ *                 belongs to the person rather than to each of them, so it
+ *                 is written on the first line and the rest run under it.
  */
 function signingMonthTables (host, rows, columns, cells, options) {
   const opts = options || {};
@@ -182,20 +191,29 @@ function signingMonthTables (host, rows, columns, cells, options) {
     [...byName.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .forEach(([name, sub]) => {
-        const row = document.createElement('tr');
-        if (!sub) row.className = 'signrow-quiet';
-        const person = document.createElement('th');
-        person.scope = 'row';
-        person.textContent = name;
-        row.appendChild(person);
-        const content = sub ? cells(sub) : (opts.missing ? opts.missing(name, entry) : []);
-        content.forEach((c, i) => {
-          const td = document.createElement('td');
-          td.setAttribute('data-label', columns[i]);
-          td.appendChild(c);
-          row.appendChild(td);
+        const lines = opts.lines
+          ? opts.lines(name, sub, entry)
+          : [sub ? cells(sub) : (opts.missing ? opts.missing(name, entry) : [])];
+        lines.forEach((content, n) => {
+          const row = document.createElement('tr');
+          if (!sub && !opts.lines) row.className = 'signrow-quiet';
+          if (n) row.classList.add('signrow-under');
+          const person = document.createElement('th');
+          person.scope = 'row';
+          person.className = 'signwho' + (n ? ' cont' : '');
+          /* Written once. Repeating it under itself reads as two people,
+             which is exactly what somebody scanning a column of names is
+             counting. */
+          person.textContent = n ? '' : name;
+          row.appendChild(person);
+          content.forEach((c, i) => {
+            const td = document.createElement('td');
+            td.setAttribute('data-label', columns[i]);
+            td.appendChild(c);
+            row.appendChild(td);
+          });
+          body.appendChild(row);
         });
-        body.appendChild(row);
       });
     table.appendChild(body);
     wrap.appendChild(table);
@@ -294,6 +312,38 @@ function labelledIcon (icon, text, label, onClick) {
 }
 
 /* -------------------------------------------------------------------
+   Her own signature
+
+   Everything else here is somebody else's document passing through. This
+   one thing is hers: the signature that goes in the Prepared by box of
+   every payment advice she writes.
+
+   It is the control the Profile step uses, because signing is one act
+   wherever it happens, and it is kept where an approver's signature is
+   kept — in this browser, never in the shared record until it is printed
+   on a form.
+   ------------------------------------------------------------------- */
+
+function renderMySignature () {
+  const host = document.getElementById('sigPa');
+  if (!host) return;
+  mountSignaturePicker(host, {
+    get: () => myLastSignature(),
+    set: url => rememberSignature(url || '')
+  }, () => { renderAdvice(); });
+}
+
+/** a line saying the Prepared by box will print empty, and where to fix it */
+function adviceSignatureWarning () {
+  if (myLastSignature()) return null;
+  const note = document.createElement('p');
+  note.className = 'keynote warn';
+  note.textContent = 'Your signature is not on this browser yet, so the Prepared by box will ' +
+    'print empty. Put it on the Signature step first.';
+  return note;
+}
+
+/* -------------------------------------------------------------------
    Download
    ------------------------------------------------------------------- */
 
@@ -310,7 +360,7 @@ async function renderSignDownload () {
     const empty = document.createElement('p');
     empty.className = 'emptynote';
     empty.textContent = 'Nothing is waiting for the HOD\u2019s signature. Everybody is listed below ' +
-      'with where their time sheet has got.';
+      'with where their documents have got.';
     host.appendChild(empty);
   } else {
     const count = document.createElement('p');
@@ -326,25 +376,66 @@ async function renderSignDownload () {
     host.appendChild(bar);
   }
 
-  signingMonthTables(host, rows, ['Status', 'Time sheet'], sub => {
-    const who = `${sub.consultant || 'consultant'}, ${periodOf(sub)}`;
-    return [statusBadge('Waiting for signature'), signingDocument('Time sheet', sub.invoice_no || '', [
-      labelledIcon('view', 'View', 'View the time sheet for ' + who, () => reviewSubmission(sub.id)),
-      labelledIcon('download', 'Download', 'Download the time sheet for ' + who,
-                   control => downloadForSigning(sub, control))
-    ])];
-  }, {
+  /* Two lines per person, because a month is two documents to print: the
+     time sheet the HOD signs, and the payment advice he signs with it. The
+     name is the same on both, so it is written once. */
+  signingMonthTables(host, rows, ['Document', 'Status'], null, {
     roster: signingRoster(),
     fallbackMonth: currentSigningMonth(),
-    missing: (name, month) => [statusBadge(sheetStatusWords(name, month.y, month.m)), emptyCell()]
+    lines: (name, sub, month) => [
+      downloadLine(name, month, 'claim', sub),
+      downloadLine(name, month, 'advice', null)
+    ]
   });
 }
 
-/** the time sheet as it was approved, as a PDF for the printer */
+/** one document of one person's month: what it is, and where it has got */
+function downloadLine (name, month, kind, claim) {
+  /* `month.m` is the month the API numbers from one, as every other table
+     here reads it. Treating it as a JavaScript month index looked for
+     October's records under September and found nobody. */
+  const where = { consultant: name, period_year: month.y, period_month: month.m };
+  const who = `${name || 'consultant'}, ${MONTHS[Math.max(0, month.m - 1)]} ${month.y}`;
+  const label = kind === 'advice' ? 'Payment Advice' : 'Time sheet';
+
+  const doc = kind === 'claim' ? claim : null;
+  const advice = kind === 'advice' ? adviceFor(where) : null;
+  const ready = kind === 'claim' ? doc : (advice && advice.status === SIGNING_STATUS ? advice : null);
+  const target = kind === 'claim' ? doc : advice;
+
+  const words = kind === 'claim'
+    ? sheetStatusWords(name, month.y, month.m)
+    : advice ? adviceWords(advice) : 'Not written yet';
+
+  if (!ready) {
+    const quiet = signingDocument(label, 'Not ready to print yet',
+      target ? [labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
+                             () => reviewSubmission(target.id))] : []);
+    quiet.classList.add('signdoc-quiet');
+    return [quiet, statusBadge(words)];
+  }
+
+  return [signingDocument(label, ready.invoice_no || '', [
+    labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
+                 () => reviewSubmission(ready.id)),
+    labelledIcon('download', 'Download', `Download the ${label.toLowerCase()} for ${who}`,
+                 control => downloadForSigning(ready, control))
+  ]), statusBadge(words)];
+}
+
+/** the document as it was approved, as a PDF for the printer */
 async function signingPdf (sub) {
   const full = await Sync.submission(sub.id);
   if (!full || !full.data) throw new Error('That document could not be read.');
   const state = mergeDefaults(full.data);
+  if (kindOf(sub) === 'advice') {
+    /* Hers goes on it as it is printed, so the sheet the HOD signs already
+       carries the Prepared by signature rather than an empty box. */
+    state.sig = state.sig || {};
+    if (!state.sig.pa && myLastSignature()) state.sig.pa = myLastSignature();
+    return { blob: (await buildAdvicePDF(state)).output('blob'),
+             name: adviceFileBase(state) + '.pdf' };
+  }
   return { blob: (await buildClaimPDF(state)).output('blob'), name: claimFileBase(state) + '.pdf' };
 }
 
@@ -454,47 +545,63 @@ async function renderSignUpload () {
       'approved has been filed.';
     host.appendChild(empty);
   }
-  signingMonthTables(host, waiting,
-    ['Status', 'Time sheet', 'Signed time sheet', 'Signed payment advice'],
-    row => [statusBadge(sheetStatusWords(row.consultant, row.period_year, row.period_month))]
-      .concat(uploadCells(row)), {
-      roster: signingRoster(),
-      fallbackMonth: currentSigningMonth(),
-      missing: (name, month) =>
-        [statusBadge(sheetStatusWords(name, month.y, month.m)),
-         emptyCell(), emptyCell(), emptyCell()]
-    });
+  /* Two lines per person, the same two the Download page prints: the signed
+     time sheet and the signed payment advice, each against the month it
+     belongs to. Only the signed copies are asked for here — the unsigned
+     forms are on the Download page, and a column of them on this one was a
+     column nobody clicked. */
+  const byMonth = new Map();
+  waiting.forEach(r => byMonth.set(`${r.consultant}|${r.period_year}|${r.period_month}`, r));
+  signingMonthTables(host, waiting, ['Document', 'Status', 'Signed copy'], null, {
+    roster: signingRoster(),
+    fallbackMonth: currentSigningMonth(),
+    lines: (name, row, month) => {
+      const found = row || byMonth.get(`${name}|${month.y}|${month.m}`) ||
+        { consultant: name, period_year: month.y, period_month: month.m,
+          claim: null, advice: null };
+      return [uploadLine(found, 'claim'), uploadLine(found, 'advice')];
+    }
+  });
 
   host.appendChild(submitBar());
 }
 
 /**
- * One month's row: the time sheet that was approved, the signed scan put
- * against it, and the signed payment advice put against that.
+ * One document of one person's month: what it is, whether its signed copy
+ * is in, and the box to put that copy in.
  *
- * Both scans work the same way and neither is sent until Submit, so the two
- * pickers are the same picker told which document it is for.
+ * Both documents work the same way and neither is sent until Submit, so the
+ * two lines are the same line told which document it is for.
  */
-function uploadCells (row) {
-  const who = `${row.consultant || 'consultant'}, ${periodOf(row)}`;
+function uploadLine (row, kind) {
+  const label = kind === 'advice' ? 'Payment Advice' : 'Time sheet';
+  const filed = typeof archiveFor === 'function'
+    ? archiveFor(row.consultant, row.period_year, Number(row.period_month) - 1, kind) : null;
+  const target = row[kind];
+  const held = target && attached.get(target.id);
 
-  const sheet = row.claim
-    ? signingDocument('Time sheet', row.invoice_no || '', [
-        labelledIcon('view', 'View', 'View the time sheet for ' + who,
-                     () => reviewSubmission(row.claim.id))])
-    : signingDocument('Filed', 'Its signed copy is already on the record', []);
+  const doc = signingDocument(label, row.invoice_no || '', []);
+  if (!target && !filed) doc.classList.add('signdoc-quiet');
 
-  return [sheet, uploadSlot(row, 'claim'), uploadSlot(row, 'advice')];
+  const words = held ? 'Ready to submit'
+    : filed ? 'Uploaded'
+      : target ? 'Not uploaded'
+        : uploadWaitingWords(row, kind);
+  const badge = statusBadge(words);
+  if (filed && !held) badge.classList.add('done');
+
+  return [doc, badge, uploadSlot(row, kind, filed, target, held)];
 }
 
-/** why one of the two cells has no box in it yet */
+/** where a document that cannot be uploaded yet has got to */
 function uploadWaitingWords (row, kind) {
-  if (kind === 'claim') return 'The HOD has not approved this time sheet yet.';
+  if (kind === 'claim') {
+    return sheetStatusWords(row.consultant, Number(row.period_year), Number(row.period_month));
+  }
   const a = adviceFor(row);
-  if (!a) return 'Not written yet \u2014 write it on the Payment Advice step.';
-  if (a.status === 'complete') return 'Already filed.';
-  return 'With the approvers: ' +
-    ((typeof STATUS_TEXT === 'object' && STATUS_TEXT[a.status]) || a.status) + '.';
+  if (!a) return 'Not written yet';
+  if (a.status === 'complete') return 'Closed';
+  return adviceWords(a);
 }
 
 /**
@@ -504,29 +611,21 @@ function uploadWaitingWords (row, kind) {
  * because filing a copy and closing a month are one act and half of it is
  * worse than neither.
  */
-function uploadSlot (row, kind) {
-  const target = row[kind];
+function uploadSlot (row, kind, filed, target, file) {
   const who = `${row.consultant || 'consultant'}, ${periodOf(row)}`;
   const what = kind === 'advice' ? 'payment advice' : 'time sheet';
 
   const cell = document.createElement('div');
   cell.className = 'signcell';
 
-  /* What is already on file, if anything. Whoever is about to replace a copy
-     should be able to look at the copy they are replacing. */
-  const filed = typeof archiveFor === 'function'
-    ? archiveFor(row.consultant, row.period_year, Number(row.period_month) - 1, kind) : null;
-
   if (!target) {
-    const note = document.createElement('p');
-    note.className = 'signhint';
-    note.textContent = uploadWaitingWords(row, kind);
-    cell.appendChild(note);
+    /* Nothing to upload against yet. What is already on file still shows,
+       because a copy filed last month is the answer to "did that go?". */
     if (filed) cell.appendChild(onFileNote(filed, row, kind, false));
+    else cell.appendChild(emptyCell());
     return cell;
   }
 
-  const file = attached.get(target.id);
   if (file) {
     /* Put on, not sent. The cell names the file it is holding, offers it to
        be looked at, and offers to let it go again — all three, because the
@@ -1491,9 +1590,15 @@ async function openAdviceEditor (sub, trigger) {
     preparedName: (Auth.personFor('pa') || ''),
     approvedName: (Auth.personFor('boss') || '')
   }, state.advice || {});
+  /* Hers, from the Signature step. The form carries it rather than asking
+     for it again, which is the whole reason it is put there first. */
+  state.sig = state.sig || {};
+  if (myLastSignature()) state.sig.pa = myLastSignature();
   adviceOpen = { sub: sub, state: state };
 
   host.innerHTML = '';
+  const warn = adviceSignatureWarning();
+  if (warn) host.appendChild(warn);
   host.appendChild(adviceFormDoc(state, () => {}));
 }
 

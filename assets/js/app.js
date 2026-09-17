@@ -110,8 +110,12 @@ const STEPS = [
      Writing the advice and filing the signed copies are separate steps
      because they are separate days: one is a form to fill in and check, the
      other is a scan of that form once the HOD has put his name on it. */
-  { id: 'todownload', label: 'Download', signs: true },
+  /* Her own signature first, because it is the one thing on the payment
+     advice that is hers rather than the claim's, and a form prepared before
+     it exists prints a Prepared by box with a name and no signature. */
+  { id: 'mysign',     label: 'Signature', signs: true },
   { id: 'advice',     label: 'Payment Advice', signs: true },
+  { id: 'todownload', label: 'Download', signs: true },
   { id: 'toupload',   label: 'Upload',   signs: true },
   /* Not a step either: the job behind, rather than the job in front. */
   /* Called History for the PA, who has no other: it is where a confirmed
@@ -197,7 +201,8 @@ function canLeave (id) {
    September should not first be asked to pick a document they are not going
    to produce, and somebody whose invoice was rejected should not have to
    finish a fresh claim before they can read why. */
-const INFO_STEPS = ['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed', 'advice'];
+const INFO_STEPS = ['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed',
+                    'advice', 'mysign'];
 
 function goToStep (i, skipGuard) {
   const list = activeSteps();
@@ -240,6 +245,7 @@ function showStep () {
   if (step.id === 'approvals') { renderApprovals(); renderArchive(); }
   if (step.id === 'history') renderHistory();
   if (step.id === 'resubmit') renderResubmit();
+  if (step.id === 'mysign') renderMySignature();
   if (step.id === 'todownload') renderSignDownload();
   if (step.id === 'toupload') renderSignUpload();
   if (step.id === 'advice') renderAdvice();
@@ -373,7 +379,8 @@ function renderNavRows () {
     const nextLabels = {
       choose: 'Choose documents', claim: 'Complete claim form', invoice: 'Review invoice',
       generate: 'Preview & download', submit: 'Review submission',
-      resubmit: 'Review returned documents', todownload: 'Download documents', toupload: 'Upload signed documents'
+      resubmit: 'Review returned documents', todownload: 'Download documents',
+      toupload: 'Upload signed documents', mysign: 'Your signature'
     };
     next.textContent = (nextLabels[list[nextAt].id] || list[nextAt].label) + ' →';
     /* On step 1, Next is not offered while there is a reason it would be

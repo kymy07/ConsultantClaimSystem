@@ -254,7 +254,7 @@ check('and approving is a capability too',
 // asked an administrator opening the app to see whether Amila had sent
 // September to choose a document they were never going to produce.
 check('a reporting step is not gated behind the form',
-  /const INFO_STEPS = \['approvals', 'history', 'resubmit', 'todownload', 'toupload', 'filed', 'advice'\]/.test(appjs) &&
+  /const INFO_STEPS = \[[\s\S]{0,140}'advice', 'mysign'\]/.test(appjs) &&
   /!skipGuard && !reporting/.test(appjs), true);
 check('the stage headings name who does the stage',
   /Auth\.personFor\(st\.who\)/.test(approvals), true);
@@ -565,9 +565,23 @@ check('the preview is shown before the document is loaded into it',
 /* Fatin and Jiha look at the same months from either end of one step, so the
    PA's Download and Upload pages are the same table the collect list is. */
 check("the PA's pages are tables, like the collect list",
-  /signingMonthTables\(host, rows, \['Status', 'Time sheet'\]/.test(signingjs) &&
-  /\['Status', 'Time sheet', 'Signed time sheet', 'Signed payment advice'\]/.test(signingjs) &&
+  /signingMonthTables\(host, rows, \['Document', 'Status'\]/.test(signingjs) &&
+  /signingMonthTables\(host, waiting, \['Document', 'Status', 'Signed copy'\]/.test(signingjs) &&
   /table\.className = 'history-table signingtable'/.test(signingjs), true);
+/* A month is two documents on both of those pages, and the name belongs to
+   the person rather than to each of them: repeated under itself it reads as
+   two people, which is what somebody scanning a column of names counts. */
+check('each person is one name and two document lines',
+  /lines: \(name, sub, month\) => \[/.test(signingjs) &&
+  /lines: \(name, row, month\) => \{/.test(signingjs) &&
+  /person\.textContent = n \? '' : name/.test(signingjs), true);
+/* Her own signature, before anything else: it goes in the Prepared by box
+   of every advice she writes, and a form prepared before it exists prints
+   that box with a name and no signature. */
+check("the PA puts her own signature on first",
+  /\{ id: 'mysign'/.test(appjs) && /id="p-mysign"/.test(html) &&
+  /function renderMySignature[\s\S]{0,240}mountSignaturePicker/.test(signingjs) &&
+  /if \(myLastSignature\(\)\) state\.sig\.pa = myLastSignature\(\)/.test(signingjs), true);
 /* Everybody with a profile has a line, the way the collect list does, so
    the PA sees who has not sent anything as well as what is waiting. */
 check("the PA's tables list everybody with a profile",
@@ -730,7 +744,7 @@ check('the HOD signs it on paper and the PA files the scan',
   !/openAdviceSigning/.test(signingjs) &&
   /function waitingAdvice[\s\S]{0,200}kindOf\(s\) === 'advice'/.test(signingjs), true);
 check('and the two are separate steps, in the order the job happens',
-  /\{ id: 'todownload'[\s\S]{0,120}\{ id: 'advice'[\s\S]{0,140}\{ id: 'toupload'/
+  /\{ id: 'mysign'[\s\S]{0,140}\{ id: 'advice'[\s\S]{0,140}\{ id: 'todownload'[\s\S]{0,120}\{ id: 'toupload'/
     .test(appjs), true);
 /* Three documents produced weeks apart is one folder to anybody who was
    asked for "September", so the administrator's record compiles one. */
