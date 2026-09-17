@@ -6,11 +6,12 @@
    bill, prepared by the PA and approved by the HOD, and the consultant
    never sees it.
 
-   So it is drawn here rather than filled in anywhere: everything on it is
-   already known by the time it exists — who is being paid, which invoice,
-   how much, and for which month. Nobody retypes a figure that the invoice
-   already carries, because a payment advice that disagrees with the invoice
-   it pays is the one mistake this form can make.
+   So it is drawn rather than asked for: everything on it is already known
+   by the time it exists — who is being paid, which invoice, how much, and
+   for which month — and it opens filled in with the invoice's own figures,
+   which is the only way a payment advice can be sure of agreeing with the
+   invoice it pays. Every box on it can still be typed over, because it is
+   the office's sheet and the office answers for what it says.
 
    The layout follows UZMA-FA01-IMS-OS01 (F01) Rev. 05 as it is printed.
    ======================================================================= */
@@ -39,6 +40,11 @@ function adviceDay (value) {
   return `${String(d.getDate()).padStart(2, '0')}-${ADV_MON[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
 }
 
+/** the same, except a box nobody filled stays empty rather than saying today */
+function adviceDate (value) {
+  return value ? adviceDay(value) : '';
+}
+
 /** the month this advice pays for, as the form writes it: Aug 2026 */
 function adviceMonth (S) {
   const ts = S.timesheet || {};
@@ -49,6 +55,47 @@ function adviceMonth (S) {
 /** what the advice is worth: the invoice's own total, never retyped */
 function adviceAmount (S) {
   return (invoiceTotals(S) || {}).total || 0;
+}
+
+/* The sheet has five document lines: the invoice this advice pays, and four
+   more for whatever came with it. */
+const ADV_ROWS = 5;
+
+/** what somebody typed, or what the claim says where they typed nothing */
+function advPick (value, fallback) {
+  return value === undefined || value === null ? fallback : value;
+}
+
+/**
+ * The five lines of the documents table.
+ *
+ * The first is the invoice's own — its number, the day it arrived, what it
+ * is worth — until somebody types over it, and then it is theirs.
+ * `S.advice.rows` holds what was typed; a line nobody touched falls back to
+ * the claim, which is why an advice nobody opened still prints the invoice
+ * it pays.
+ */
+function adviceRows (S) {
+  const a = S.advice || {};
+  const saved = Array.isArray(a.rows) ? a.rows : [];
+  const rows = [];
+  for (let i = 0; i < ADV_ROWS; i++) {
+    const r = saved[i] || {};
+    const first = i === 0;
+    rows.push({
+      no:          advPick(r.no,          first ? (S.invoice.no || '') : ''),
+      received:    advPick(r.received,    first ? (a.receivedDate || '') : ''),
+      poNo:        advPick(r.poNo,        first ? (a.poNo || '') : ''),
+      projectCode: advPick(r.projectCode, first ? (a.projectCode || '') : ''),
+      amount:      advPick(r.amount,      first ? adviceAmount(S) : '')
+    });
+  }
+  return rows;
+}
+
+/** what the sheet comes to: its own lines added up, whatever they now say */
+function adviceTotal (rows) {
+  return round2(rows.reduce((t, r) => t + (Number(r.amount) || 0), 0));
 }
 
 function adviceFileBase (S) {
@@ -62,34 +109,53 @@ const ADV_CATEGORIES = ['Cost of Sales', 'Opex', 'Fixed Asset', 'Inventory'];
 /**
  * Everything the form says, gathered in one place.
  *
- * `S.advice` carries only what the form cannot work out for itself — the
- * dates somebody wrote, and the handful of boxes that belong to the office
- * rather than to the claim: the payment term, a PO or project code if there
- * is one, who the account manager is, and the tax. Everything else is read
- * from the claim, so the two can never drift apart.
+ * The claim answers most of it — the vendor, the invoice, the amount, the
+ * month — and that is what the form opens filled in with, so an advice
+ * nobody touched can never disagree with the invoice it pays. But it is the
+ * office's own sheet and the office has the last word on every box: anything
+ * `S.advice` carries is what somebody typed there, and it stands in for what
+ * the claim would have said. A box typed empty stays empty; a box never
+ * touched follows the claim.
  */
 function adviceFields (S) {
   const a = S.advice || {};
   const pa = (typeof Auth !== 'undefined' && Auth.personFor('pa')) || '';
   const boss = (typeof Auth !== 'undefined' && Auth.personFor('boss')) || '';
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = adviceRows(S);
+  const total = adviceTotal(rows);
+  const gl = {};
+  ADV_GL.forEach(code => {
+    gl[code] = advPick((a.gl || {})[code], code === ADV_DEPT ? total : '');
+  });
   return {
-    dept: ADV_DEPT,
-    vendor: S.consultant.name || '',
-    address: [S.consultant.addr1, S.consultant.addr2].filter(Boolean).join(', '),
-    invoiceNo: S.invoice.no || '',
-    received: adviceDay(a.receivedDate),
-    amount: adviceAmount(S),
-    details: `Payment for Consultancy Service Fee- ${adviceMonth(S)}`,
-    preparedName: a.preparedName || pa,
-    preparedDate: adviceDay(a.preparedDate),
-    approvedName: a.approvedName || boss,
-    approvedDate: adviceDay(a.approvedDate),
+    dept: advPick(a.dept, ADV_DEPT),
+    vendor: advPick(a.vendor, S.consultant.name || ''),
+    address: advPick(a.address,
+                     [S.consultant.addr1, S.consultant.addr2].filter(Boolean).join(', ')),
+    rows: rows,
+    gl: gl,
+    invoiceNo: rows[0].no,
+    received: adviceDate(rows[0].received),
+    amount: total,
+    details: advPick(a.details, `Payment for Consultancy Service Fee- ${adviceMonth(S)}`),
+    foreign: a.foreign || '',
+    preparedName: advPick(a.preparedName, pa),
+    preparedDate: adviceDate(advPick(a.preparedDate, today)),
+    reviewedName: a.reviewedName || '',
+    reviewedDate: adviceDate(a.reviewedDate),
+    approvedName: advPick(a.approvedName, boss),
+    approvedDate: adviceDate(advPick(a.approvedDate, today)),
+    taxName: a.taxName || '',
+    taxDate: adviceDate(a.taxDate),
+    financeName: a.financeName || '',
+    financeDate: adviceDate(a.financeDate),
     // the office's own boxes, blank on the form until somebody fills them
     terms: a.terms || '',
     backToBack: !!a.backToBack,
     advance: a.advance !== false,
-    poNo: a.poNo || '',
-    projectCode: a.projectCode || '',
+    poNo: rows[0].poNo,
+    projectCode: rows[0].projectCode,
     staff: a.staff || '',
     chargeable: a.chargeable || '',
     manager: a.manager || '',
@@ -284,19 +350,19 @@ async function buildAdvicePDF (S) {
   at('- Attach PO -', mid(3), 84.1, { align: 'center' });
   at('- Attach PFS -', mid(4), 84.1, { align: 'center' });
 
-  for (let n = 1; n <= 5; n++) {
-    const y = top + headH + attachH + rowH * (n - 1);
+  F.rows.forEach((row, i) => {
+    const y = top + headH + attachH + rowH * i;
     ink(7.33);
-    at(String(n), mid(0), y + 3.8, { align: 'center' });
-    if (n === 1) {
-      filled(8.17);
-      at(F.invoiceNo, mid(1), y + 3.85, { align: 'center' });
-      at(F.received, mid(2), y + 3.85, { align: 'center' });
-      if (F.poNo) at(F.poNo, mid(3), y + 3.85, { align: 'center' });
-      if (F.projectCode) at(F.projectCode, mid(4), y + 3.85, { align: 'center' });
-      at('RM' + money(F.amount), cols[6] - 1.3, y + 3.85, { align: 'right' });
+    at(String(i + 1), mid(0), y + 3.8, { align: 'center' });
+    filled(8.17);
+    if (row.no) at(row.no, mid(1), y + 3.85, { align: 'center' });
+    if (row.received) at(adviceDate(row.received), mid(2), y + 3.85, { align: 'center' });
+    if (row.poNo) at(row.poNo, mid(3), y + 3.85, { align: 'center' });
+    if (row.projectCode) at(row.projectCode, mid(4), y + 3.85, { align: 'center' });
+    if (row.amount !== '' && row.amount != null) {
+      at('RM' + money(row.amount), cols[6] - 1.3, y + 3.85, { align: 'right' });
     }
-  }
+  });
 
   ink(6.61, 'bolditalic');
   at('Notes: Arrange the attachments in sequence start with Invoice, Bill, PO, PFS, TRF and others.',
@@ -323,7 +389,7 @@ async function buildAdvicePDF (S) {
   at('For services paying to foreign beneficiary, please indicate whether services are rendered ' +
      'inside or ', labelX, 148.7);
   at('outside Malaysia.', labelX, 152.05);
-  box(fieldX, 152.95, ADV.detailsR - fieldX, 8.04, '');
+  box(fieldX, 152.95, ADV.detailsR - fieldX, 8.04, F.foreign);
 
   ink(7.33);
   at('Staff/ Consultant', labelX, 167.9);
@@ -375,9 +441,10 @@ async function buildAdvicePDF (S) {
     const ry = glTop + glRow * (i + 1);
     ink(7.33);
     at(code, (ADV.glX + ADV.glSplit) / 2, ry + 2.95, { align: 'center' });
-    if (code === ADV_DEPT) {
+    const charged = F.gl[code];
+    if (charged !== '' && charged != null) {
       filled(8.17);
-      at('RM' + money(F.amount), R - 1.5, ry + 2.95, { align: 'right' });
+      at('RM' + money(charged), R - 1.5, ry + 2.95, { align: 'right' });
     }
   });
 
@@ -401,6 +468,9 @@ async function buildAdvicePDF (S) {
   at('(Tax Department)', 188.66, 184.0, { align: 'right' });
   at('Name :', 139.62, 187.5);
   at('Date   :', 139.62, 191.4);
+  filled(6.61);
+  if (F.taxName) at(F.taxName, 150.30, 187.5);
+  if (F.taxDate) at(F.taxDate, 150.30, 191.4);
 
   /* ---- who prepared it, and who approved it ---- */
   band(ADV.bands.approval, 'Payment Advice Approval');
@@ -412,7 +482,8 @@ async function buildAdvicePDF (S) {
   const columns = [
     { title: 'Prepared by :', name: F.preparedName, date: F.preparedDate, sig: (S.sig || {}).pa,
       rule: [32.50, 72.24] },
-    { title: 'Reviewed by :', name: '', date: '', note: ' (if required)', rule: [84.43, 127.72] },
+    { title: 'Reviewed by :', name: F.reviewedName, date: F.reviewedDate,
+      note: ' (if required)', rule: [84.43, 127.72] },
     { title: 'Approved by :', name: F.approvedName, date: F.approvedDate, sig: (S.sig || {}).hod,
       rule: [145.62, 193.79] }
   ];
@@ -467,6 +538,9 @@ async function buildAdvicePDF (S) {
   ink(7.33);
   at('Received by :', labelX, 253.8);
   at('Received Date :', 84.92, 253.8);
+  filled(8.17);
+  if (F.financeName) at(F.financeName, labelX + 19.60, 253.8);
+  if (F.financeDate) at(F.financeDate, 84.92 + 24.60, 253.8);
 
   /* ---- the form's own footer ---- */
   ink(6.61);

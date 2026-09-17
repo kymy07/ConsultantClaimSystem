@@ -1314,20 +1314,13 @@ async function renderAdvice () {
    who has filled one in on paper is not learning a new screen — they are
    looking at the same sheet with the typing done for them.
 
-   Most of it is already known and none of that is offered: the vendor, the
-   invoice it pays, the amount and the month come from the claim, because a
-   payment advice that disagrees with its own invoice is the one mistake this
-   form can make. What is left is the office's own, and what the profile
-   already answers is answered.
+   Most of it is already known and all of that is filled in: the vendor, the
+   invoice it pays, the amount and the month come from the claim, so an
+   advice nobody edited cannot disagree with its own invoice. But every box
+   takes a cursor. It is the office's sheet, the office answers for what it
+   says, and a form that cannot be corrected is a form somebody retypes
+   in Excel.
    ------------------------------------------------------------------- */
-
-/** a value the invoice decided: shown in its box, not offered for typing */
-function advFixed (value, cls) {
-  const cell = document.createElement('span');
-  cell.className = 'adv-box adv-fixed' + (cls ? ' ' + cls : '');
-  cell.textContent = value == null ? '' : String(value);
-  return cell;
-}
 
 /** one of the office's own boxes, typed into where the sheet has it */
 function advInput (value, onChange, opts) {
@@ -1342,6 +1335,63 @@ function advInput (value, onChange, opts) {
   input.addEventListener('input', tell);
   input.addEventListener('change', tell);
   return input;
+}
+
+/** a box the sheet gives more than one line of: an address, a description */
+function advArea (value, onChange, opts) {
+  const o = opts || {};
+  const area = document.createElement('textarea');
+  area.className = 'adv-in' + (o.cls ? ' ' + o.cls : '');
+  area.rows = o.rows || 2;
+  area.value = value == null ? '' : String(value);
+  if (o.label) area.setAttribute('aria-label', o.label);
+  const tell = () => onChange(area.value);
+  area.addEventListener('input', tell);
+  area.addEventListener('change', tell);
+  return area;
+}
+
+/**
+ * A date on the sheet.
+ *
+ * The form prints 27-Aug-26; this keeps the date itself and lets the
+ * browser offer whatever picker it has, because a date typed as text is a
+ * date somebody can typo into next year.
+ */
+function advDate (value, onChange, opts) {
+  const o = opts || {};
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.className = 'adv-box adv-in adv-day' + (o.cls ? ' ' + o.cls : '');
+  input.value = value == null ? '' : String(value);
+  if (o.label) input.setAttribute('aria-label', o.label);
+  /* An empty date box says dd/mm/yyyy in every browser that has a picker,
+     and four empty lines all saying it is not the blank paper this copies.
+     So it is marked when it holds a date, and says dd/mm/yyyy only then or
+     while somebody is in it. */
+  const mark = () => input.classList.toggle('filled', !!input.value);
+  const tell = () => { mark(); onChange(input.value); };
+  mark();
+  input.addEventListener('input', tell);
+  input.addEventListener('change', tell);
+  return input;
+}
+
+/** what was typed into a money box, as a figure the sheet can add up */
+function advMoney (text) {
+  const clean = String(text).replace(/[^0-9.-]/g, '');
+  return clean === '' ? '' : (Number(clean) || 0);
+}
+
+/** one of the money boxes: RM beside it, as the sheet prints it */
+function advCash (value, onChange, label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'adv-cash';
+  wrap.appendChild(advWord('RM'));
+  wrap.appendChild(advInput(value === '' || value == null ? '' : money(value),
+                            v => onChange(advMoney(v)),
+                            { cls: 'bare ta-r', label: label, numeric: true }));
+  return wrap;
 }
 
 /**
@@ -1407,6 +1457,13 @@ function adviceFormDoc (state, changed) {
   const a = state.advice;
   const set = (key, value) => { a[key] = value; changed(); };
 
+  /* The five document lines become the advice's own the moment it is
+     opened. Until now they were worked out from the invoice each time the
+     sheet was drawn; from here they are what is on the sheet, which is what
+     being able to correct them means. */
+  a.rows = F.rows;
+  const setRow = (i, key, value) => { a.rows[i][key] = value; changed(); };
+
   const doc = document.createElement('div');
   doc.className = 'doc doc-advice';
 
@@ -1436,9 +1493,15 @@ function adviceFormDoc (state, changed) {
 
   /* ---- primary details ---- */
   doc.appendChild(advBand('Primary Details'));
-  doc.appendChild(advRow('Department Code', [advFixed(F.dept, 'w-sm')]));
-  doc.appendChild(advRow('Vendor Name', [advFixed(F.vendor, 'w-full')]));
-  doc.appendChild(advRow('Vendor Address', [advFixed(F.address, 'w-full adv-tall')]));
+  doc.appendChild(advRow('Department Code', [
+    advInput(F.dept, v => set('dept', v), { cls: 'w-sm ta-c', label: 'Department code' })
+  ]));
+  doc.appendChild(advRow('Vendor Name', [
+    advInput(F.vendor, v => set('vendor', v), { cls: 'w-full', label: 'Vendor name' })
+  ]));
+  doc.appendChild(advRow('Vendor Address', [
+    advArea(F.address, v => set('address', v), { cls: 'w-full adv-tall', label: 'Vendor address' })
+  ]));
   doc.appendChild(advRow('Payment Term', [
     advInput(a.terms, v => set('terms', v),
              { cls: 'w-xs ta-c', placeholder: '30', label: 'Payment term in days', numeric: true }),
@@ -1463,37 +1526,58 @@ function adviceFormDoc (state, changed) {
       </tr>
     </thead>
     <tbody></tbody>`;
-  const body = table.querySelector('tbody');
-  for (let n = 1; n <= 5; n++) {
+  const tbody = table.querySelector('tbody');
+
+  /* TOTAL is the one figure on the sheet nobody types: it is what the five
+     lines come to, so it follows them as they are typed rather than being
+     another box to keep in step. */
+  const totalBox = document.createElement('span');
+  totalBox.className = 'adv-box adv-sum bare ta-r strong';
+  const glBoxes = {};
+  const retotal = () => {
+    const sum = adviceTotal(a.rows);
+    totalBox.textContent = 'RM' + money(sum);
+    /* The charge-back line for the department follows the total too, until
+       somebody puts a figure of their own on it. */
+    const auto = glBoxes[ADV_DEPT];
+    if (auto && (a.gl || {})[ADV_DEPT] === undefined) auto.value = money(sum);
+  };
+
+  for (let n = 1; n <= ADV_ROWS; n++) {
+    const i = n - 1;
+    const row = a.rows[i];
     const tr = document.createElement('tr');
     const idx = document.createElement('td');
     idx.textContent = String(n);
     idx.className = 'ta-c';
     tr.appendChild(idx);
-    for (let c = 0; c < 5; c++) {
+    [
+      advInput(row.no, v => setRow(i, 'no', v),
+               { cls: 'bare ta-c', label: 'Invoice or bill number, line ' + n }),
+      advDate(row.received, v => setRow(i, 'received', v),
+              { cls: 'bare ta-c', label: 'Invoice or bill received date, line ' + n }),
+      advInput(row.poNo, v => setRow(i, 'poNo', v),
+               { cls: 'bare ta-c', label: 'PO number, line ' + n }),
+      advInput(row.projectCode, v => setRow(i, 'projectCode', v),
+               { cls: 'bare ta-c', label: 'Project code, line ' + n }),
+      advCash(row.amount, v => { setRow(i, 'amount', v); retotal(); }, 'Amount, line ' + n)
+    ].forEach(node => {
       const td = document.createElement('td');
-      if (n === 1) {
-        if (c === 0) td.appendChild(advFixed(F.invoiceNo, 'bare ta-c'));
-        if (c === 1) td.appendChild(advFixed(F.received, 'bare ta-c'));
-        if (c === 2) td.appendChild(advInput(a.poNo, v => set('poNo', v),
-          { cls: 'bare ta-c', label: 'PO number' }));
-        if (c === 3) td.appendChild(advInput(a.projectCode, v => set('projectCode', v),
-          { cls: 'bare ta-c', label: 'Project code' }));
-        if (c === 4) td.appendChild(advFixed('RM' + money(F.amount), 'bare ta-r'));
-      }
+      td.appendChild(node);
       tr.appendChild(td);
-    }
-    body.appendChild(tr);
+    });
+    tbody.appendChild(tr);
   }
+
   const foot = document.createElement('tr');
   foot.className = 'adv-total';
   foot.innerHTML = `<td colspan="4"><i>Notes: Arrange the attachments in sequence start with
     Invoice, Bill, PO, PFS, TRF and others.</i></td><td class="ta-r">TOTAL</td>`;
   const total = document.createElement('td');
   total.className = 'ta-r';
-  total.appendChild(advFixed('RM' + money(F.amount), 'bare ta-r strong'));
+  total.appendChild(totalBox);
   foot.appendChild(total);
-  body.appendChild(foot);
+  tbody.appendChild(foot);
   doc.appendChild(advRow('Documents', [table], 'adv-docrow'));
 
   /* ---- other details: the left column, then the panels beside it ---- */
@@ -1503,12 +1587,20 @@ function adviceFormDoc (state, changed) {
 
   const left = document.createElement('div');
   left.className = 'adv-otherleft';
-  left.appendChild(advRow('Details of Payment', [advFixed(F.details, 'w-full adv-tall')]));
+  left.appendChild(advRow('Details of Payment', [
+    advArea(F.details, v => set('details', v),
+            { cls: 'w-full adv-tall', label: 'Details of payment' })
+  ]));
   const note = document.createElement('p');
   note.className = 'adv-note';
   note.textContent = 'For services paying to foreign beneficiary, please indicate whether ' +
     'services are rendered inside or outside Malaysia.';
   left.appendChild(note);
+  /* The sheet gives that note a box of its own and no label; so does this. */
+  left.appendChild(advRow('', [
+    advInput(F.foreign, v => set('foreign', v),
+             { cls: 'w-full', label: 'Whether services are rendered inside or outside Malaysia' })
+  ]));
   left.appendChild(advRow('Staff/ Consultant', [
     advInput(a.staff, v => set('staff', v), { cls: 'w-md', label: 'Staff or consultant' }),
     advWord('- Attach TRF -', 'adv-attachword')
@@ -1537,11 +1629,18 @@ function adviceFormDoc (state, changed) {
     c.className = 'ta-c';
     const v = document.createElement('td');
     v.className = 'ta-r';
-    if (code === ADV_DEPT) v.textContent = 'RM' + money(F.amount);
+    const cash = advCash(F.gl[code], val => {
+      a.gl = a.gl || {};
+      a.gl[code] = val;
+      changed();
+    }, 'Amount charged back to ' + code);
+    glBoxes[code] = cash.querySelector('input');
+    v.appendChild(cash);
     tr.appendChild(c);
     tr.appendChild(v);
     glBody.appendChild(tr);
   });
+  retotal();
   const charge = document.createElement('div');
   charge.className = 'adv-charge';
   charge.appendChild(advWord('Charge Back To', 'adv-turn'));
@@ -1560,12 +1659,18 @@ function adviceFormDoc (state, changed) {
     { cls: 'w-xs ta-c', label: 'Withholding tax percentage', numeric: true }));
   pct.appendChild(advWord('%'));
   tax.appendChild(pct);
-  ['Verified by:', 'Name :', 'Date  :'].forEach(line => {
-    const p = document.createElement('div');
-    p.className = 'adv-taxline';
-    p.appendChild(advWord(line));
-    tax.appendChild(p);
-  });
+  const taxLine = (text, node) => {
+    const line = document.createElement('div');
+    line.className = 'adv-taxline';
+    line.appendChild(advWord(text));
+    if (node) line.appendChild(node);
+    tax.appendChild(line);
+  };
+  taxLine('Verified by:');
+  taxLine('Name :', advInput(F.taxName, v => set('taxName', v),
+                             { label: 'Tax department name' }));
+  taxLine('Date  :', advDate(a.taxDate || '', v => set('taxDate', v),
+                             { label: 'Tax department date' }));
   const dept = document.createElement('span');
   dept.className = 'adv-taxdept';
   dept.textContent = '(Tax Department)';
@@ -1574,48 +1679,49 @@ function adviceFormDoc (state, changed) {
   other.appendChild(right);
   doc.appendChild(other);
 
-  /* ---- who prepared it, and who approved it ---- */
+  /* ---- who prepared it, who reviewed it, and who approved it ---- */
   doc.appendChild(advBand('Payment Advice Approval'));
   const sign = document.createElement('div');
   sign.className = 'adv-sign';
   const ink = state.sig || {};
   [
-    ['Prepared by :', F.preparedName, F.preparedDate, '', ink.pa],
-    ['Reviewed by :', '', '', '(if required)', ''],
-    ['Approved by :', F.approvedName, F.approvedDate, '', ink.hod]
+    { title: 'Prepared by :', name: 'preparedName', date: 'preparedDate', sig: ink.pa },
+    { title: 'Reviewed by :', name: 'reviewedName', date: 'reviewedDate', note: '(if required)' },
+    { title: 'Approved by :', name: 'approvedName', date: 'approvedDate', sig: ink.hod }
   ].forEach(col => {
     const cell = document.createElement('div');
     cell.className = 'adv-signcol';
     const title = document.createElement('b');
-    title.textContent = col[0];
+    title.textContent = col.title;
     cell.appendChild(title);
-    if (col[3]) {
+    if (col.note) {
       const small = document.createElement('i');
-      small.textContent = col[3];
+      small.textContent = col.note;
       cell.appendChild(small);
     }
     /* Her signature, shown where it will print. It is put on the Signature
        step and carried here, so the box she is looking at is the box the
        HOD will be handed rather than a promise that it will be filled. */
-    if (col[4]) {
+    if (col.sig) {
       const mark = document.createElement('img');
       mark.className = 'adv-sig';
-      mark.src = col[4];
-      mark.alt = col[1] ? col[1] + '’s signature' : 'Signature';
+      mark.src = col.sig;
+      mark.alt = F[col.name] ? F[col.name] + '\u2019s signature' : 'Signature';
       cell.appendChild(mark);
     }
     const rule = document.createElement('span');
     rule.className = 'adv-rule';
     cell.appendChild(rule);
+    const who = col.title.replace(' :', '');
     const name = document.createElement('div');
     name.className = 'adv-signline';
     name.appendChild(advWord('Name :'));
-    name.appendChild(advFixed(col[1], 'bare'));
+    name.appendChild(advInput(F[col.name], v => set(col.name, v), { label: who + ' name' }));
     cell.appendChild(name);
     const when = document.createElement('div');
     when.className = 'adv-signline';
     when.appendChild(advWord('Date  :'));
-    when.appendChild(advFixed(col[2], 'bare'));
+    when.appendChild(advDate(a[col.date] || '', v => set(col.date, v), { label: who + ' date' }));
     cell.appendChild(when);
     sign.appendChild(cell);
   });
@@ -1624,8 +1730,17 @@ function adviceFormDoc (state, changed) {
   doc.appendChild(advBand('Finance Account Payable Department'));
   const fin = document.createElement('div');
   fin.className = 'adv-fin';
-  fin.appendChild(advWord('Received by :'));
-  fin.appendChild(advWord('Received Date :'));
+  const finLine = (text, node) => {
+    const line = document.createElement('div');
+    line.className = 'adv-finline';
+    line.appendChild(advWord(text));
+    line.appendChild(node);
+    fin.appendChild(line);
+  };
+  finLine('Received by :', advInput(F.financeName, v => set('financeName', v),
+                                    { label: 'Finance received by' }));
+  finLine('Received Date :', advDate(a.financeDate || '', v => set('financeDate', v),
+                                     { label: 'Finance received date' }));
   doc.appendChild(fin);
 
   const footer = document.createElement('div');
@@ -1673,6 +1788,7 @@ async function adviceStateFor (invoiceSub, adviceSub) {
   state.advice = Object.assign({
     receivedDate: today,
     preparedDate: today,
+    approvedDate: today,
     preparedName: (Auth.personFor('pa') || ''),
     approvedName: (Auth.personFor('boss') || '')
   }, state.advice || {});
@@ -1744,69 +1860,24 @@ function closeAdviceEditor (restoreFocus) {
   adviceTrigger = null;
 }
 
-/** the advice for one month, drawn from whatever it is built from, in a tab */
+/**
+ * The advice for one month, drawn from whatever it is built from.
+ *
+ * It opens in the viewer every other document here opens in, over the table
+ * it was asked for from. A tab of its own put the sheet somewhere the app
+ * could not close again, and a pop-up blocker put it nowhere at all; the
+ * viewer has Open in new tab on its own bar for anybody who wants one.
+ */
 async function previewAdviceFor (sub, advice, control) {
   if (signingBusy) return;
-  const tab = window.open('', '_blank');
   signingBusy = true;
   if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
   try {
     const state = await adviceStateFor(sub, advice);
     const doc = await buildAdvicePDF(state);
-    const blob = doc.output('blob');
-    if (tab && !tab.closed) {
-      const url = URL.createObjectURL(blob);
-      tab.location = url;
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } else {
-      openFilePreview('Payment Advice \u00b7 ' + (sub.consultant || ''),
-                      adviceFileBase(state) + '.pdf', blob, control);
-      toast('Your browser blocked the new tab, so it opened here instead.');
-    }
+    openFilePreview('Payment Advice \u00b7 ' + (sub.consultant || ''),
+                    adviceFileBase(state) + '.pdf', doc.output('blob'), control);
   } catch (err) {
-    if (tab && !tab.closed) tab.close();
-    toast(err.message || 'Could not draw it.', true);
-  } finally {
-    signingBusy = false;
-    if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
-  }
-}
-
-/**
- * The form as it stands, in a tab of its own.
- *
- * A tab rather than the in-app viewer, because this one is read beside the
- * boxes that fill it: somebody checking a payment advice wants the sheet on
- * one screen and the form on the other, and a dialog over the form they are
- * checking against is the one place it cannot be.
- *
- * The tab is opened on the click and pointed at the document afterwards. A
- * browser only allows a new tab while it can still see the click that asked
- * for one, and drawing the PDF takes long enough to lose it. If the tab was
- * blocked anyway, the viewer is still there to fall back on.
- */
-async function previewAdvice (control) {
-  if (signingBusy || !adviceOpen) return;
-  const tab = window.open('', '_blank');
-  signingBusy = true;
-  if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
-  try {
-    const doc = await buildAdvicePDF(adviceOpen.state);
-    const name = adviceFileBase(adviceOpen.state) + '.pdf';
-    const blob = doc.output('blob');
-    if (tab && !tab.closed) {
-      /* Revoked on a timer rather than at once: the tab has to have loaded
-         it first, and there is no event here that says it has. */
-      const url = URL.createObjectURL(blob);
-      tab.location = url;
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } else {
-      openFilePreview('Payment Advice · ' + (adviceOpen.sub.consultant || ''),
-                      name, blob, control);
-      toast('Your browser blocked the new tab, so it opened here instead.');
-    }
-  } catch (err) {
-    if (tab && !tab.closed) tab.close();
     toast(err.message || 'Could not draw it.', true);
   } finally {
     signingBusy = false;

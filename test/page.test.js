@@ -581,7 +581,8 @@ check('each person is one name and two document lines',
 /* And it is shown on the form where it will print, not only promised: the
    box she is looking at is the box the HOD will be handed. */
 check('her signature is drawn in the Prepared by box',
-  /\['Prepared by :', F\.preparedName, F\.preparedDate, '', ink\.pa\]/.test(signingjs) &&
+  /\{ title: 'Prepared by :', name: 'preparedName', date: 'preparedDate', sig: ink\.pa \}/
+    .test(signingjs) &&
   /mark\.className = 'adv-sig'/.test(signingjs) &&
   /\.doc-advice \.adv-sig\{/.test(css), true);
 check("the PA puts her own signature on first",
@@ -709,14 +710,17 @@ check('the advice opens as a page, drawn as the sheet it is',
   /function adviceFormDoc/.test(signingjs) &&
   /id="adviceEditor"/.test(html) &&
   /doc\.className = 'doc doc-advice'/.test(signingjs), true);
-/* Nothing the invoice decided may be retyped: it is the invoice's own
-   figures or it is nothing, so those sit in their boxes as text and only the
-   office's own boxes take a cursor. */
-check('only the office boxes are typed into',
-  /function advFixed/.test(signingjs) && /function advInput/.test(signingjs) &&
-  /advFixed\(F\.vendor/.test(signingjs) && /advFixed\(F\.invoiceNo/.test(signingjs) &&
-  /advInput\(a\.terms/.test(signingjs) && /advInput\(a\.withholding/.test(signingjs) &&
-  !/advInput\(F\./.test(signingjs), true);
+/* Every box on it takes a cursor. The invoice's own figures are what it
+   opens with, so an advice nobody edited still agrees with the invoice it
+   pays — but this is the office's sheet, the office answers for what it
+   says, and a form that cannot be corrected is a form somebody retypes in
+   Excel. Nothing on it is shown as text that cannot be reached. */
+check('every box on it is typed into',
+  !/function advFixed/.test(signingjs) &&
+  /advInput\(F\.vendor/.test(signingjs) && /advArea\(F\.address/.test(signingjs) &&
+  /advInput\(row\.no/.test(signingjs) && /advDate\(row\.received/.test(signingjs) &&
+  /advCash\(row\.amount/.test(signingjs) && /advInput\(F\[col\.name\]/.test(signingjs) &&
+  /advInput\(a\.terms/.test(signingjs) && /advInput\(a\.withholding/.test(signingjs), true);
 /* Two of them the system already knows. The rest stay blank: a payment term
    nobody agreed, printed as though somebody had, is not a time-saver. */
 /* And nothing else is guessed at. Staff/Consultant and Account Manager are
@@ -725,17 +729,17 @@ check('only the office boxes are typed into',
 check('nothing on it is guessed',
   !/adviceFromProfile/.test(signingjs) &&
   !/a\.staff = /.test(signingjs) && !/a\.manager = /.test(signingjs), true);
-/* Checked beside the boxes that fill it: the sheet on one screen and the
-   form on the other, which a dialog over the form cannot be. The tab is
-   opened on the click, because a browser only allows one while it can still
-   see the click that asked. */
-check('the preview opens in a tab of its own',
-  /const tab = window\.open\('', '_blank'\)/.test(signingjs) &&
-  /tab\.location = url/.test(signingjs) &&
-  /Preview in new tab/.test(html), true);
-check('and falls back to the viewer if the tab was blocked',
-  /if \(tab && !tab\.closed\) \{[\s\S]{0,320}\} else \{[\s\S]{0,120}openFilePreview/
-    .test(signingjs), true);
+/* And it is read in the viewer every other document here is read in, over
+   the table it was asked for from. A tab of its own put the sheet somewhere
+   the app could not close again, and a pop-up blocker put it nowhere at all;
+   the viewer carries Open in new tab on its own bar for anybody who wants
+   one. The editor has no preview of its own: the sheet on screen is the
+   sheet that prints. */
+check('the preview opens in the viewer, not a tab',
+  /async function previewAdviceFor[\s\S]{0,420}openFilePreview\('Payment Advice/
+    .test(signingjs) &&
+  !/window\.open/.test(signingjs) &&
+  !/adviceEditorPreview/.test(html) && !/adviceEditorPreview/.test(appjs), true);
 /* The office's own PDF is US Letter set in Calibri, with the content
    running 21.34mm to 194.01mm. Drawn on A4 in Helvetica, every row landed
    a few millimetres from where the paper expects it; these are the numbers
@@ -825,9 +829,23 @@ console.log('\nThe Payment Advice');
 check('the form is drawn to the template it copies',
   /function buildAdvicePDF/.test(genadvice) &&
   /UZMA-FA01-IMS-OS01 \(F01\)/.test(genadvice), true);
-check('and nothing on it is retyped',
-  /invoiceNo: S\.invoice\.no/.test(genadvice) &&
-  /amount: adviceAmount\(S\)/.test(genadvice) &&
+/* What is typed stands in for what the claim would have said, box by box,
+   so a figure typed over is the figure that prints. */
+check('and what was typed is what prints',
+  /function advPick[\s\S]{0,140}value === undefined \|\| value === null \? fallback : value/
+    .test(genadvice) &&
+  /vendor: advPick\(a\.vendor/.test(genadvice) &&
+  /dept: advPick\(a\.dept, ADV_DEPT\)/.test(genadvice) &&
+  /F\.rows\.forEach/.test(genadvice), true);
+/* TOTAL is the exception, because it is not a box: it is what the five
+   document lines come to, and it follows them as they are typed. */
+check('except the total, which is added up',
+  /function adviceTotal[\s\S]{0,160}reduce/.test(genadvice) &&
+  /totalBox\.textContent = 'RM' \+ money\(sum\)/.test(signingjs), true);
+check('and nothing on it has to be retyped',
+  /no:          advPick\(r\.no,          first \? \(S\.invoice\.no \|\| ''\) : ''\)/
+    .test(genadvice) &&
+  /amount:      advPick\(r\.amount,      first \? adviceAmount\(S\) : ''\)/.test(genadvice) &&
   /Payment for Consultancy Service Fee- \$\{adviceMonth\(S\)\}/.test(genadvice), true);
 check('it is a document a month can carry',
   /advice:  \{ label: 'Payment Advice'/.test(statejs), true);

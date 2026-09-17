@@ -610,18 +610,30 @@ body.locked > .sitefoot{display:none}
 .doc-advice .adv-word{font-size:10.5px;white-space:nowrap}
 .doc-advice .adv-attachword{font-style:italic;font-weight:700;font-size:9px}
 
-/* every value sits in one of the form's boxes, typed or not */
+/* every value sits in one of the form's boxes, and every box is typed in */
 .doc-advice .adv-box{
   border:1px solid #8a8a8a;background:#fff;padding:3px 6px;min-height:22px;
   font-size:11px;color:#00209c;display:flex;align-items:center;min-width:0
 }
-.doc-advice .adv-fixed{white-space:pre-wrap;overflow-wrap:anywhere}
-.doc-advice input.adv-in{
+/* TOTAL, the one figure nobody types: it is what the lines above come to */
+.doc-advice .adv-sum{white-space:nowrap}
+.doc-advice .adv-in{
   font:inherit;font-size:11px;color:#00209c;border:1px solid #8a8a8a;
   border-radius:0;background:#fff;padding:3px 6px;min-height:22px;width:100%
 }
-.doc-advice input.adv-in:focus{outline:2px solid var(--navy-soft);outline-offset:-2px}
-.doc-advice .adv-box.bare,.doc-advice input.adv-in.bare{border:none;background:transparent;width:100%}
+.doc-advice .adv-in:focus{outline:2px solid var(--navy-soft);outline-offset:-2px}
+.doc-advice .adv-box.bare,.doc-advice .adv-in.bare{border:none;background:transparent;width:100%}
+/* the boxes the sheet gives more than a line: they wrap, and they can be
+   pulled taller when what goes in one is longer than the sheet allowed for */
+.doc-advice textarea.adv-in{display:block;resize:vertical;line-height:1.35;min-height:40px}
+/* a date box is the browser's own picker, made to sit in the sheet's box */
+.doc-advice input.adv-day{display:block;font-size:10.5px;padding:2px 4px}
+.doc-advice input.adv-day.bare{text-align:center}
+.doc-advice input.adv-day:not(.filled):not(:focus)::-webkit-datetime-edit{color:transparent}
+/* RM stands outside the box on the sheet, and stands outside it here */
+.doc-advice .adv-cash{display:flex;align-items:center;gap:2px;min-width:0}
+.doc-advice .adv-cash .adv-word{font-size:9.5px;color:#00209c}
+.doc-advice .adv-cash .adv-in{flex:1;min-width:0}
 .doc-advice .w-xs{flex:0 0 52px;width:52px}
 .doc-advice .w-sm{flex:0 0 120px;width:120px}
 .doc-advice .w-md{flex:0 0 230px;width:230px}
@@ -675,7 +687,12 @@ body.locked > .sitefoot{display:none}
 .doc-advice .adv-tax b{font-size:10.5px}
 .doc-advice .adv-taxrow{display:flex;align-items:center;gap:6px}
 .doc-advice .adv-taxrow .adv-in{background:#fff}
-.doc-advice .adv-taxline{border-bottom:none;font-size:9.5px}
+.doc-advice .adv-taxline{
+  border-bottom:none;font-size:9.5px;display:flex;align-items:center;gap:6px
+}
+.doc-advice .adv-taxline .adv-in{
+  flex:1;min-width:0;background:#fff;font-size:9.5px;padding:2px 4px;min-height:18px
+}
 .doc-advice .adv-taxdept{font-size:8.5px;text-align:right}
 
 .doc-advice .adv-sign{display:flex;gap:14px;margin-top:6px}
@@ -689,10 +706,13 @@ body.locked > .sitefoot{display:none}
 .doc-advice .adv-sig{max-width:100%;max-height:42px;object-fit:contain;
   object-position:center bottom;align-self:center;margin-top:6px}
 .doc-advice .adv-rule{border-top:1px dashed #8a8a8a;margin-top:auto}
-.doc-advice .adv-signline{display:flex;align-items:baseline;gap:6px;font-size:9.5px}
-.doc-advice .adv-signline .adv-box{min-height:0;padding:0;font-size:9.5px}
+.doc-advice .adv-signline{display:flex;align-items:center;gap:6px;font-size:9.5px}
+.doc-advice .adv-signline .adv-in{
+  flex:1;min-width:0;font-size:9.5px;padding:2px 4px;min-height:18px
+}
 .doc-advice .adv-fin{display:flex;gap:14px;font-size:10.5px;padding:4px 0 26px}
-.doc-advice .adv-fin .adv-word{flex:1}
+.doc-advice .adv-finline{flex:1;display:flex;align-items:center;gap:6px;min-width:0}
+.doc-advice .adv-finline .adv-in{flex:1;min-width:0}
 .doc-advice .adv-foot{
   display:flex;justify-content:space-between;gap:10px;font-size:8.5px;
   border-top:1px solid #d9d9d9;padding-top:6px

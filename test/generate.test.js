@@ -101,7 +101,8 @@ vm.runInContext(`
   function toast () {}
 `, ctx);
 
-[ 'assets/js/gen-invoice.js', 'assets/js/gen-claim.js' ].forEach(load);
+[ 'assets/js/gen-invoice.js', 'assets/js/gen-claim.js',
+  'assets/js/gen-advice.js' ].forEach(load);
 
 // JSZip has no Blob support under Node — use toBuffer for tests only
 ctx.docx.Packer.toBlob = ctx.docx.Packer.toBuffer.bind(ctx.docx.Packer);
@@ -380,6 +381,53 @@ vm.runInContext(`
       failures.push(`${label} threw: ${e.message}`);
       console.log(`  FAIL  ${label}: ${e.message}`);
     }
+  }
+
+  /* -----------------------------------------------------------------------
+     The payment advice. It is the office's own form and every box on it can
+     be typed over, so what has to hold is that it opens as the invoice it
+     pays, and that what somebody typed is what comes out the other end.
+     ----------------------------------------------------------------------- */
+  console.log('\nThe payment advice');
+  const adv = expr => vm.runInContext(expr, ctx);
+  adv(`
+    globalThis.__adv = JSON.parse(JSON.stringify(__S));
+    __adv.invoice.items = [{ desc: 'Consultancy Service Fee', amount: 3500 }];
+    globalThis.__advF = adviceFields(__adv);
+  `);
+  check('it opens as the invoice it pays',    adv('__advF.invoiceNo'), 'INV-2026-08-026');
+  check('for the vendor the claim names',     adv('__advF.vendor'), 'Ahmad bin Abdullah');
+  check('worth what that invoice is worth',   adv('__advF.amount'), 3500);
+  check('charged to the department',          adv('__advF.gl.D030'), 3500);
+  check('and the four lines under it empty',
+        adv('__advF.rows.slice(1).every(r => r.amount === "" && r.no === "")'), true);
+
+  adv(`
+    __adv.advice = {
+      vendor: 'Somebody Else Sdn. Bhd.', dept: 'D099', details: 'Paid in full',
+      rows: [{ no: 'INV-1', amount: 1000 }, { no: 'INV-2', amount: 250.5 }]
+    };
+    globalThis.__advE = adviceFields(__adv);
+  `);
+  check('a box typed over prints what was typed', adv('__advE.vendor'), 'Somebody Else Sdn. Bhd.');
+  check('including the department code',          adv('__advE.dept'), 'D099');
+  check('a second line is a second line',         adv('__advE.rows[1].no'), 'INV-2');
+  check('the total is what the lines come to',    adv('__advE.amount'), 1250.5);
+  check('and the charge-back line follows it',  adv('__advE.gl.D030'), 1250.5);
+  check('unless a figure is put on its own line',
+        adv('(__adv.advice.gl = { D030: 99 }, adviceFields(__adv).gl.D030)'), 99);
+  adv('__adv.advice.vendor = "";');
+  check('a box typed empty stays empty',          adv('adviceFields(__adv).vendor === ""'), true);
+
+  adv('globalThis.__advDoc = buildAdvicePDF(__adv);');
+  try {
+    const doc = await ctx.__advDoc;
+    const bytes = new Uint8Array(doc.output('arraybuffer'));
+    check('the advice draws as a PDF', String.fromCharCode(...bytes.slice(0, 4)), '%PDF');
+    check('with all five of its lines on it', bytes.length > 20000, true);
+  } catch (e) {
+    failures.push(`Payment Advice PDF threw: ${e.message}`);
+    console.log(`  FAIL  Payment Advice PDF: ${e.message}`);
   }
 
   /* -----------------------------------------------------------------------
