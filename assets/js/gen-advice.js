@@ -430,9 +430,14 @@ async function buildAdvicePDF (S) {
       try {
         const sig = await normalizeSignature(c.sig);
         if (sig) {
+          /* Centred over the dotted rule it is signed on, and sat just above
+             it, the way a hand puts a signature on a line — not tucked into
+             the corner under the label. */
           const maxW = 34, maxH = 12;
           const sc = Math.min(maxW / sig.w, maxH / sig.h);
-          doc.addImage(sig.url, 'PNG', x, 213, sig.w * sc, sig.h * sc);
+          const w = sig.w * sc, h = sig.h * sc;
+          const mid = (c.rule[0] + c.rule[1]) / 2;
+          doc.addImage(sig.url, 'PNG', mid - w / 2, 229.4 - h, w, h);
         }
       } catch (err) { /* the name and the date still stand */ }
     }
