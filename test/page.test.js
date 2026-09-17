@@ -833,14 +833,21 @@ check('the administrator compiles a month into one zip, everybody at once',
    empty one is a slip, and the administrator is offered to take it off. Only
    the administrator, only when nothing is filed under it, and never on the
    strength of an empty cache. */
-check('an empty duplicate profile is pointed out to everybody, and offered to the administrator',
-  /function duplicateProfileNote/.test(signingjs) &&
-  /const admin = typeof Auth !== 'undefined' && Auth\.isAdmin\(\);/.test(signingjs) &&
-  /if \(admin\) \{[\s\S]{0,80}Remove this profile/.test(signingjs) &&
-  /if \(!nothingFiledUnder\(name\)\) return null;/.test(signingjs) &&
-  /nameDistance\(n, who\) <= 2/.test(signingjs), true);
+/* The profile is the person. An empty profile beside a documented near-name
+   is the slip; documents under a spelling with no profile, beside a name
+   that has one, are the slip. The two point in opposite directions, and the
+   button on the row does the one thing the case calls for — for the
+   administrator and the PA, who keep the record. */
+check('a duplicate is pointed out to everybody, and the slip is the one without the person',
+  /function duplicateCase/.test(signingjs) &&
+  /if \(profileUnder\(name\) && here\.total === 0 && profileUnder\(other\) && filedUnder\(other\)\.total > 0\)/.test(signingjs) &&
+  /if \(!profileUnder\(name\) && here\.total > 0 && profileUnder\(other\)\)/.test(signingjs) &&
+  /Auth\.isAdmin\(\) \|\| Auth\.places\(\)/.test(signingjs) &&
+  /Sync\.removeStrayName\(name\)/.test(signingjs) &&
+  /removeStrayName: removeStrayName/.test(syncjs), true);
 check('and never on the strength of an empty cache',
-  /if \(!mine\.length && !theirs\.length\) return false;/.test(signingjs), true);
+  /if \(!here\.known\) return null;/.test(signingjs) &&
+  /const known = !!\(mine\.length \|\| theirs\.length\);/.test(signingjs), true);
 check('the note is on the PA’s tables and the Status table alike',
   /const dup = duplicateProfileNote\(name, \(\) => \{/.test(signingjs) &&
   /duplicateProfileNote\(name, \(\) => renderApprovals\(\)\)/.test(approvals), true);

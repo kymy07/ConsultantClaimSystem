@@ -2139,23 +2139,34 @@ function nameDistance (a, b) {
   return prev[b.length];
 }
 
-/**
- * True when nothing at all has been filed under this exact name.
- *
- * Read off whichever list of submissions this page loaded — the PA pages
- * keep one, the Status table keeps its own — and off the archive. When no
- * list has been loaded at all the answer is "not known", which is false:
- * an offer to remove a profile must never rest on an empty cache.
- */
+/** true when nothing at all has been filed under this exact name */
 function nothingFiledUnder (name) {
+  return filedUnder(name).total === 0 && filedUnder(name).known;
+}
+
+/**
+ * What is on the record under one exact spelling: submissions and filed
+ * copies, counted off whichever lists this page has loaded. `known` is
+ * false when no list has been loaded at all, because then the answer is
+ * "not known" rather than "nothing" — nothing here may rest on an empty
+ * cache.
+ */
+function filedUnder (name) {
   const who = String(name || '').trim();
   const mine = signingSubs || [];
   const theirs = (typeof subs !== 'undefined' && Array.isArray(subs)) ? subs : [];
-  if (!mine.length && !theirs.length) return false;
+  const known = !!(mine.length || theirs.length);
   const under = s => String(s.consultant || '').trim() === who;
-  if (mine.some(under) || theirs.some(under)) return false;
-  const filed = typeof archive !== 'undefined' ? archive : [];
-  return !filed.some(r => String(r.consultant || '').trim() === who);
+  const seen = new Set();
+  mine.concat(theirs).forEach(s => { if (under(s)) seen.add(s.id); });
+  const filed = (typeof archive !== 'undefined' ? archive : []).filter(under).length;
+  return { known: known, submissions: seen.size, filed: filed, total: seen.size + filed };
+}
+
+/** is there a profile on the shared list under this exact spelling? */
+function profileUnder (name) {
+  try { return Object.prototype.hasOwnProperty.call(Store.profiles(), String(name || '').trim()); }
+  catch (err) { return false; }
 }
 
 /** the other name this one looks like a slip of, if there is one */
@@ -2165,31 +2176,90 @@ function likelyDuplicateOf (name, roster) {
 }
 
 /**
- * The note on an empty duplicate's row, and the one button.
+ * One person, twice, and which of the two is the slip.
  *
- * The note is for everybody: whoever is looking at two rows for one person
- * should be told why there are two, whether or not they can do anything
- * about it. The button is the administrator's alone, because taking a
- * profile off the shared list is theirs to do. Null on every other row.
+ * The profile is the person: a spelling with a profile on the shared list
+ * is somebody, and a spelling without one is a name that got onto the
+ * record some other way. So there are two cases, and they point in
+ * opposite directions:
+ *
+ *   an empty profile, a letter or two from a name that has documents
+ *     — the profile is the slip; take the profile off;
+ *   documents under a spelling with no profile, a letter or two from a
+ *     name that has one — the documents are the slip; take them off.
+ *
+ * Anything else is left alone: two empty near-names, or two with
+ * documents each, are two questions this cannot answer.
+ *
+ * @returns {{ kind: 'profile'|'documents', other: string, filed: object } | null}
  */
-function duplicateProfileNote (name, after) {
-  if (!nothingFiledUnder(name)) return null;
+function duplicateCase (name) {
+  const here = filedUnder(name);
+  if (!here.known) return null;
   const other = likelyDuplicateOf(name);
   if (!other) return null;
-  const admin = typeof Auth !== 'undefined' && Auth.isAdmin();
+  /* Both profiled, this one empty and the other documented: this one is
+     the slip. If the other has no profile it is not the person — it is
+     the slip, and the second case below says so on its own row. */
+  if (profileUnder(name) && here.total === 0 && profileUnder(other) && filedUnder(other).total > 0) {
+    return { kind: 'profile', other: other, filed: here };
+  }
+  if (!profileUnder(name) && here.total > 0 && profileUnder(other)) {
+    return { kind: 'documents', other: other, filed: here };
+  }
+  return null;
+}
+
+/**
+ * The note on a duplicate's row, and the one button.
+ *
+ * The note is for everybody: whoever is looking at two rows for one person
+ * should be told why there are two. The button is for the two people who
+ * keep the record — the administrator, and the PA, who is the one looking
+ * at these tables — and does the one thing the case calls for. The server
+ * checks the case again before anything goes.
+ */
+function duplicateProfileNote (name, after) {
+  const found = duplicateCase(name);
+  if (!found) return null;
+  const may = typeof Auth !== 'undefined' && (Auth.isAdmin() || Auth.places());
+  const n = found.filed;
+  const count = `${n.submissions} submission${n.submissions === 1 ? '' : 's'} and ` +
+    `${n.filed} filed cop${n.filed === 1 ? 'y' : 'ies'}`;
 
   const note = document.createElement('div');
   note.className = 'dupnote';
   const said = document.createElement('span');
-  said.textContent = `Looks like a slip of “${other}” — nothing has been filed ` +
-    'under this spelling.' + (admin ? '' : ' The administrator can take it off.');
+  said.textContent = found.kind === 'profile'
+    ? `Looks like a slip of \u201c${found.other}\u201d \u2014 this profile has nothing filed under it.`
+    : `Looks like a slip of \u201c${found.other}\u201d \u2014 there is no profile under this spelling, ` +
+      `only ${count} filed under it.`;
+  if (!may) said.textContent += ' The administrator or the PA can take it off.';
   note.appendChild(said);
-  if (admin) {
-    note.appendChild(button('Remove this profile', 'ghost small danger', () => {
-      if (typeof removeProfile !== 'function') return;
-      removeProfile(name);
+  if (!may) return note;
+
+  const label = found.kind === 'profile' ? 'Remove this profile' : 'Remove those documents';
+  note.appendChild(button(label, 'ghost small danger', async () => {
+    const what = found.kind === 'profile'
+      ? `Remove the empty profile \u201c${name}\u201d?`
+      : `Remove ${count} filed under \u201c${name}\u201d?`;
+    if (!confirm(`${what}` + '\n\n' +
+                 `\u201c${found.other}\u201d stays as it is. This cannot be undone.`)) return;
+    try {
+      if (found.kind === 'profile') {
+        Store.deleteProfile(name);
+        await Sync.deleteProfile(name);
+      } else {
+        const gone = await Sync.removeStrayName(name);
+        archiveLoaded = false;
+        toast(`Removed ${gone.submissions} submission${gone.submissions === 1 ? '' : 's'} and ` +
+              `${gone.filed} filed cop${gone.filed === 1 ? 'y' : 'ies'} under \u201c${name}\u201d.`);
+      }
       if (after) after();
-    }));
-  }
+    } catch (err) {
+      toast(err.message || 'Could not remove that.', true);
+    }
+  }));
   return note;
 }
+

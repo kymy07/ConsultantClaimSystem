@@ -601,6 +601,16 @@ async function unstoreSigned (id) {
   await ccsFetch('/archive/' + encodeURIComponent(id), { method: 'DELETE' });
 }
 
+/**
+ * Take a stray spelling off the record: every document filed under a name
+ * that has no profile, when a profile exists a letter or two away. The
+ * server decides whether the name qualifies and refuses otherwise, so
+ * what comes back is either the counts or the reason it would not.
+ */
+async function removeStrayName (name) {
+  return ccsFetch('/names/' + encodeURIComponent(name), { method: 'DELETE' });
+}
+
 const Sync = {
   init: initSync,
   me: whoAmI,
@@ -623,6 +633,7 @@ const Sync = {
   stored: storedClaims,
   storedOne: storedClaim,
   unstore: unstoreSigned,
+  removeStrayName: removeStrayName,
   forget: forgetSync,
   get on () { return syncOn; },
   /* The probe answers after the first paint. Until it has, a screen that
