@@ -571,7 +571,31 @@ check("the PA's pages are tables, like the collect list",
    the PA sees who has not sent anything as well as what is waiting. */
 check("the PA's tables list everybody with a profile",
   /function signingRoster/.test(signingjs) &&
-  (signingjs.match(/roster: signingRoster\(\)/g) || []).length === 2, true);
+  (signingjs.match(/roster: signingRoster\(\)/g) || []).length === 3, true);
+/* The payment advice is the third of those tables. It is the office's form,
+   so a person with no invoice yet is shown locked rather than left out: the
+   page answers "who is left?" as well as "what can I do?". */
+check('the payment advice is a table of everybody, like the other two',
+  /signingMonthTables\(host, rows, \['Status', 'Payment Advice'\]/.test(signingjs) &&
+  /missing: \(\) => \[statusBadge\('Invoice not submitted'\), adviceLockedCell\(\)\]/
+    .test(signingjs), true);
+/* An invoice sent back is going to change, and its figures are the only
+   figures the advice has, so that row locks again rather than paying a
+   disputed bill. */
+check('an invoice sent back locks the row again',
+  /function adviceUnlocked[\s\S]{0,120}invoice\.status !== 'returned'/.test(signingjs) &&
+  /if \(adviceUnlocked\(sub\)\) \{[\s\S]{0,40}button\('Edit'/.test(signingjs), true);
+check('and it unlocks on the invoice being sent, not on it being approved',
+  /function invoicesSubmitted[\s\S]{0,200}kindOf\(s\) === 'invoice'/.test(signingjs) &&
+  !/function invoicesApproved/.test(signingjs), true);
+/* Nothing on the form may be retyped: it is the invoice's own figures or it
+   is nothing, so the panel offers only the boxes the claim knows nothing
+   about, and shows the rest as facts. */
+check('the editor offers the office boxes and no others',
+  /function openAdviceEditor/.test(signingjs) &&
+  /adviceInput\('Payment Term \(days\)'/.test(signingjs) &&
+  /adviceInput\('Witholding Tax \(%\)'/.test(signingjs) &&
+  /adviceFact\(pair\[0\], pair\[1\]\)/.test(signingjs), true);
 check('somebody with no time sheet that month reads Not submitted',
   /if \(!sub\) return 'Not submitted'/.test(signingjs), true);
 check('but a claim still with the project manager or the HOD is not called that',

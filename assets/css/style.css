@@ -718,6 +718,18 @@ body.locked > .sitefoot{display:none}
 }
 .signsaid{margin:0;font-size:12.5px;color:var(--muted);max-width:80ch}
 
+/* what the invoice already decided, shown on the payment advice panel but
+   not offered for typing */
+.advicefacts{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:6px 20px;padding:12px 14px;border:1px solid var(--line);
+  border-radius:8px;background:#f7fafd
+}
+.advicefact{display:flex;gap:8px;align-items:baseline;min-width:0}
+.advicefact-label{font-size:11.5px;color:var(--muted);flex:0 0 40%}
+.advicefact-value{font-size:12.5px;font-weight:600;color:var(--navy);
+  overflow-wrap:anywhere;min-width:0}
+
 /* ---------- Save Profile, where the details it saves end ---------- */
 .saverow{
   display:flex;align-items:center;gap:14px;flex-wrap:wrap;

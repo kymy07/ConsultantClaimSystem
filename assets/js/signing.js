@@ -883,12 +883,31 @@ async function saveStored (rec, control) {
    in the box it calls Prepared by.
    ------------------------------------------------------------------- */
 
-/** the invoices the HOD has approved, newest month first */
-function invoicesApproved () {
+/**
+ * The invoices a payment advice could be written against.
+ *
+ * Every invoice that has been sent counts, not only the approved ones. The
+ * advice is locked until the consultant sends the invoice, because there is
+ * nothing to pay before that; once it is sent the PA can get the form ready
+ * while it travels, and the row keeps saying where the invoice itself is.
+ */
+function invoicesSubmitted () {
   return signingSubs
-    .filter(s => s.status === 'complete' && kindOf(s) === 'invoice')
+    .filter(s => kindOf(s) === 'invoice')
     .slice()
     .sort(byMonthThenName);
+}
+
+/**
+ * Can an advice be written for this invoice yet?
+ *
+ * One exception to "it has been sent": an invoice sent back to the consultant
+ * is going to change, and its figures are the only figures this form has.
+ * Writing one against it would be paying a bill somebody has already
+ * disputed, so the row waits for it to come round again.
+ */
+function adviceUnlocked (invoice) {
+  return !!invoice && invoice.status !== 'returned';
 }
 
 /** the advice for one person and month, whatever stage it has reached */
@@ -910,6 +929,31 @@ function adviceWords (advice) {
   return (typeof STATUS_TEXT === 'object' && STATUS_TEXT[advice.status]) || advice.status;
 }
 
+/**
+ * One line for the Status column.
+ *
+ * Until the advice exists the interesting thing is the invoice, because that
+ * is what the PA is waiting on; afterwards it is the advice, because that is
+ * what she is working on. Saying "Not prepared" beside an invoice nobody has
+ * sent yet would hide the reason it is not prepared.
+ */
+function adviceStatusWords (invoice, advice) {
+  if (advice) return adviceWords(advice);
+  if (!invoice) return 'Invoice not submitted';
+  if (invoice.status === 'complete') return 'Invoice approved';
+  const words = String((typeof STATUS_TEXT === 'object' && STATUS_TEXT[invoice.status]) ||
+                       invoice.status);
+  return 'Invoice \u00b7 ' + words.charAt(0).toLowerCase() + words.slice(1);
+}
+
+/** the cell for somebody whose invoice for that month has not arrived */
+function adviceLockedCell () {
+  const cell = document.createElement('div');
+  cell.className = 'signcell';
+  cell.appendChild(signingDocument('Locked', 'Unlocks when the invoice is submitted', []));
+  return cell;
+}
+
 async function renderAdvice () {
   const host = document.getElementById('adviceList');
   if (!host) return;
@@ -917,29 +961,22 @@ async function renderAdvice () {
   await learnSigningKinds();
 
   host.innerHTML = '';
-  const rows = invoicesApproved();
-
-  if (!rows.length) {
-    const empty = document.createElement('p');
-    empty.className = 'emptynote';
-    empty.textContent = 'No approved invoices yet. A payment advice is prepared once the HOD has ' +
-      'approved the invoice it pays, and one appears here for each month that reaches that point.';
-    host.appendChild(empty);
-    return;
-  }
+  const rows = invoicesSubmitted();
 
   const count = document.createElement('p');
   count.className = 'historycount';
   count.setAttribute('role', 'status');
   const waiting = rows.filter(sub => {
     const a = adviceFor(sub);
-    return !a || a.status === SIGNING_STATUS;
+    return a ? a.status === SIGNING_STATUS : adviceUnlocked(sub);
   }).length;
   count.textContent = waiting
     ? `${waiting} payment advice${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} you.`
     : 'Nothing needs you here.';
   host.appendChild(count);
 
+  /* Everybody with a profile is on the table whether or not their invoice has
+     arrived, so the page answers "who is left?" as well as "what can I do?" */
   signingMonthTables(host, rows, ['Status', 'Payment Advice'], sub => {
     const advice = adviceFor(sub);
     const who = `${sub.consultant || 'consultant'}, ${periodOf(sub)}`;
@@ -953,65 +990,237 @@ async function renderAdvice () {
     const cell = document.createElement('div');
     cell.className = 'signcell';
     cell.appendChild(signingDocument(
-      advice ? 'Payment Advice' : 'Not prepared yet',
-      advice ? (advice.invoice_no || sub.invoice_no || '') : 'Prepared from invoice ' + (sub.invoice_no || ''),
+      advice ? 'Payment Advice' : adviceUnlocked(sub) ? 'Not prepared yet' : 'Locked',
+      advice ? (advice.invoice_no || sub.invoice_no || '')
+        : adviceUnlocked(sub) ? 'From invoice ' + (sub.invoice_no || '')
+          : 'Unlocks when the invoice comes round again',
       actions));
 
     const bar = document.createElement('div');
     bar.className = 'btnrow';
     if (!advice) {
-      const go = button('Prepare and send for approval', 'primary small',
-                        () => prepareAdvice(sub, go));
-      bar.appendChild(go);
+      if (adviceUnlocked(sub)) {
+        bar.appendChild(button('Edit', 'primary small', () => openAdviceEditor(sub)));
+      }
     } else if (advice.status === SIGNING_STATUS) {
       const go = button('Sign and close', 'primary small', () => openAdviceSigning(advice, sub));
       bar.appendChild(go);
     }
     if (bar.children.length) cell.appendChild(bar);
 
-    return [statusBadge(adviceWords(advice)), cell];
+    return [statusBadge(adviceStatusWords(sub, advice)), cell];
   }, {
-    roster: [],
+    roster: signingRoster(),
     fallbackMonth: currentSigningMonth(),
-    missing: () => [statusBadge('Not prepared'), emptyCell()]
+    missing: () => [statusBadge('Invoice not submitted'), adviceLockedCell()]
   });
 }
 
+/* -------------------------------------------------------------------
+   Writing one
+
+   The form fills itself in: the vendor, the invoice it pays, the amount and
+   the month all come from the invoice the consultant sent, and none of them
+   can be typed here, because a payment advice that disagrees with its own
+   invoice is the one mistake this form can make.
+
+   What is left over is the office's own \u2014 the payment term, a PO or
+   project code if there is one, who the account manager is, and the tax.
+   Those are the boxes this panel offers, and they are the only ones.
+   ------------------------------------------------------------------- */
+
+/** a labelled input, drawn the way the profile form draws one */
+function adviceInput (label, hint, value, onChange, opts) {
+  const o = opts || {};
+  const wrap = document.createElement('label');
+  wrap.appendChild(document.createTextNode(label + ' '));
+  if (hint) {
+    const small = document.createElement('span');
+    small.className = 'hint';
+    small.textContent = hint;
+    wrap.appendChild(small);
+  }
+  const input = o.choices ? document.createElement('select') : document.createElement('input');
+  if (o.choices) {
+    o.choices.forEach(pair => {
+      const option = document.createElement('option');
+      option.value = pair[0];
+      option.textContent = pair[1];
+      input.appendChild(option);
+    });
+  } else if (o.placeholder) {
+    input.placeholder = o.placeholder;
+  }
+  input.value = value == null ? '' : String(value);
+  const tell = () => onChange(input.value);
+  input.addEventListener('input', tell);
+  input.addEventListener('change', tell);
+  wrap.appendChild(input);
+  return wrap;
+}
+
+/** one line of what the invoice already decided, which cannot be typed over */
+function adviceFact (label, value) {
+  const line = document.createElement('div');
+  line.className = 'advicefact';
+  const name = document.createElement('span');
+  name.className = 'advicefact-label';
+  name.textContent = label;
+  const text = document.createElement('span');
+  text.className = 'advicefact-value';
+  text.textContent = value || '\u2014';
+  line.appendChild(name);
+  line.appendChild(text);
+  return line;
+}
+
 /**
- * Prepare one, and send it round.
+ * Open one person's payment advice for the month, filled in from the invoice.
  *
- * Everything it says comes from the invoice it pays, so the form is built
- * from that claim's own stored state rather than from anything typed here.
- * The dates are the only thing this adds, and they are today's, because
- * today is when it was prepared.
+ * It is opened rather than generated in the background so the PA can see what
+ * the form will say before it goes anywhere, and print a draft to check it
+ * against the paper one.
  */
-async function prepareAdvice (sub, go) {
+async function openAdviceEditor (sub) {
+  const host = document.getElementById('adviceList');
+  if (!host) return;
+  const open = document.getElementById('adviceEdit');
+  if (open) open.remove();
+
+  const box = document.createElement('div');
+  box.id = 'adviceEdit';
+  box.className = 'decidebox';
+  const head = document.createElement('p');
+  head.className = 'decidehead';
+  head.textContent = 'Payment advice \u00b7 ' + (sub.consultant || '');
+  box.appendChild(head);
+  const loading = document.createElement('p');
+  loading.className = 'signhint';
+  loading.textContent = 'Reading the invoice\u2026';
+  box.appendChild(loading);
+  host.appendChild(box);
+  box.scrollIntoView({ block: 'nearest' });
+
+  let state;
+  try {
+    const full = await Sync.submission(sub.id);
+    if (!full || !full.data) throw new Error('That invoice could not be read.');
+    state = mergeDefaults(full.data);
+  } catch (err) {
+    loading.textContent = err.message || 'That invoice could not be read.';
+    return;
+  }
+
+  /* The one number on this form that must never be blank. It is the invoice's
+     own, and if the stored form somehow lacks it the row still knows it. */
+  if (!state.invoice.no && sub.invoice_no) state.invoice.no = sub.invoice_no;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const a = Object.assign({
+    receivedDate: today,
+    preparedDate: today,
+    preparedName: (Auth.personFor('pa') || ''),
+    approvedName: (Auth.personFor('boss') || '')
+  }, state.advice || {});
+  state.advice = a;
+
+  loading.remove();
+
+  const context = document.createElement('p');
+  context.className = 'status-context';
+  context.textContent = `${periodOf(sub)} \u00b7 invoice ${sub.invoice_no || ''}`;
+  box.appendChild(context);
+
+  const F = adviceFields(state);
+  const facts = document.createElement('div');
+  facts.className = 'advicefacts';
+  [
+    ['Vendor', F.vendor],
+    ['Address', F.address],
+    ['Invoice / Bill Number', F.invoiceNo],
+    ['Amount', 'RM' + money(F.amount)],
+    ['Details of Payment', F.details],
+    ['Prepared by', F.preparedName],
+    ['Approved by', F.approvedName]
+  ].forEach(pair => facts.appendChild(adviceFact(pair[0], pair[1])));
+  box.appendChild(facts);
+
+  const said = document.createElement('p');
+  said.className = 'signsaid';
+  said.textContent = 'Those come from the invoice and cannot be changed here. The boxes below ' +
+    'are the office\u2019s own, and every one of them may be left blank.';
+  box.appendChild(said);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid2';
+  grid.appendChild(adviceInput('Payment Term (days)', '', a.terms,
+                               v => { a.terms = v; }, { placeholder: 'e.g. 30' }));
+  grid.appendChild(adviceInput('Back-To-Back', '', a.backToBack, v => { a.backToBack = v; }));
+  grid.appendChild(adviceInput('PO Number', '(if applicable)', a.poNo, v => { a.poNo = v; }));
+  grid.appendChild(adviceInput('Project Code', '(if applicable)', a.projectCode,
+                               v => { a.projectCode = v; }));
+  grid.appendChild(adviceInput('Staff / Consultant', '', a.staff, v => { a.staff = v; }));
+  grid.appendChild(adviceInput('Account Manager', '', a.manager, v => { a.manager = v; }));
+  grid.appendChild(adviceInput('Chargeable to Client', '', a.chargeable, v => { a.chargeable = v; },
+    { choices: [['', 'Not marked'], ['yes', 'Yes'], ['no', 'No']] }));
+  grid.appendChild(adviceInput('Cost Category', '', a.category, v => { a.category = v; },
+    { choices: [['', 'Not marked']].concat(ADV_CATEGORIES.map(c => [c, c])) }));
+  grid.appendChild(adviceInput('Witholding Tax (%)', '', a.withholding,
+                               v => { a.withholding = v; }, { placeholder: 'e.g. 10' }));
+  box.appendChild(grid);
+
+  const bar = document.createElement('div');
+  bar.className = 'btnrow';
+  const send = button('Send for approval', 'primary', () => prepareAdvice(sub, state, send));
+  bar.appendChild(send);
+  bar.appendChild(button('Preview', 'ghost', control => previewAdvice(sub, state, control)));
+  bar.appendChild(button('Cancel', 'ghost', () => box.remove()));
+  box.appendChild(bar);
+  box.scrollIntoView({ block: 'nearest' });
+}
+
+/** the form as it stands, opened the way any other document is opened */
+async function previewAdvice (sub, state, control) {
+  if (signingBusy) return;
+  signingBusy = true;
+  if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
+  try {
+    const doc = await buildAdvicePDF(state);
+    openFilePreview('Payment Advice \u00b7 ' + (sub.consultant || ''),
+                    adviceFileBase(state) + '.pdf', doc.output('blob'), 'advice');
+  } catch (err) {
+    toast(err.message || 'Could not draw it.', true);
+  } finally {
+    signingBusy = false;
+    if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
+  }
+}
+
+/**
+ * Send one round.
+ *
+ * Everything it says comes from the invoice it pays and from the boxes just
+ * filled in, so nothing is gathered again here. It travels the road the time
+ * sheet travels: the project manager, the HOD, then back here to be signed.
+ */
+async function prepareAdvice (sub, state, go) {
   if (signingBusy) return;
   const who = `${sub.consultant || 'somebody'} \u00b7 ${periodOf(sub)}`;
-  if (!confirm(`Prepare the payment advice for ${who}?\n\n` +
-               'It is built from the approved invoice and goes to the project manager, then the ' +
-               'HOD, then back here to be signed.')) return;
+  if (!confirm(`Send the payment advice for ${who} for approval?\n\n` +
+               'It goes to the project manager, then the HOD, then back here to be signed.')) return;
 
   signingBusy = true;
   const was = go.textContent;
   go.disabled = true;
-  go.textContent = 'Preparing…';
+  go.textContent = 'Sending\u2026';
   try {
-    const full = await Sync.submission(sub.id);
-    if (!full || !full.data) throw new Error('That invoice could not be read.');
-    const state = mergeDefaults(full.data);
-    const today = new Date().toISOString().slice(0, 10);
-    state.advice = Object.assign({}, state.advice, {
-      receivedDate: today,
-      preparedDate: today,
-      preparedName: (Auth.personFor('pa') || ''),
-      approvedName: (Auth.personFor('boss') || '')
-    });
     await Sync.submit(state, 'Payment advice for ' + periodOf(sub), 'advice');
+    const box = document.getElementById('adviceEdit');
+    if (box) box.remove();
     toast('Payment advice sent to the project manager.');
     await renderAdvice();
   } catch (err) {
-    toast(err.message || 'Could not prepare it.', true);
+    toast(err.message || 'Could not send it.', true);
     go.disabled = false;
     go.textContent = was;
   } finally {

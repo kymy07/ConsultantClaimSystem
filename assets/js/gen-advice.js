@@ -52,12 +52,17 @@ function adviceFileBase (S) {
   return `Payment Advice ${adviceMonth(S)} - ${who}`;
 }
 
+/** the four boxes the form offers under Cost Category, in its own order */
+const ADV_CATEGORIES = ['Cost of Sales', 'Opex', 'Fixed Asset', 'Inventory'];
+
 /**
  * Everything the form says, gathered in one place.
  *
  * `S.advice` carries only what the form cannot work out for itself — the
- * dates somebody actually wrote. Everything else is read from the claim, so
- * the two can never drift apart.
+ * dates somebody wrote, and the handful of boxes that belong to the office
+ * rather than to the claim: the payment term, a PO or project code if there
+ * is one, who the account manager is, and the tax. Everything else is read
+ * from the claim, so the two can never drift apart.
  */
 function adviceFields (S) {
   const a = S.advice || {};
@@ -74,7 +79,18 @@ function adviceFields (S) {
     preparedName: a.preparedName || pa,
     preparedDate: adviceDay(a.preparedDate),
     approvedName: a.approvedName || boss,
-    approvedDate: adviceDay(a.approvedDate)
+    approvedDate: adviceDay(a.approvedDate),
+    // the office's own boxes, blank on the form until somebody fills them
+    terms: a.terms || '',
+    backToBack: a.backToBack || '',
+    advance: a.advance !== false,
+    poNo: a.poNo || '',
+    projectCode: a.projectCode || '',
+    staff: a.staff || '',
+    chargeable: a.chargeable || '',
+    manager: a.manager || '',
+    category: a.category || '',
+    withholding: a.withholding || ''
   };
 }
 
@@ -116,8 +132,12 @@ async function buildAdvicePDF (S) {
     doc.rect(x, y, w, h);
     if (value) {
       filled(o.size || 8);
-      doc.text(String(value), o.align === 'right' ? x + w - 1.5 : x + 1.5, y + h / 2 + 1.1,
-               o.align ? { align: o.align } : undefined);
+      /* jsPDF aligns about the x given, so a centred value needs the middle
+         of the box and not its left edge, or half of it hangs outside. */
+      const at = o.align === 'right' ? x + w - 1.5
+        : o.align === 'center' ? x + w / 2
+          : x + 1.5;
+      doc.text(String(value), at, y + h / 2 + 1.1, o.align ? { align: o.align } : undefined);
     }
   };
 
@@ -190,13 +210,13 @@ async function buildAdvicePDF (S) {
 
   ink(7.4);
   doc.text('Payment Term', labelX, 75.7);
-  box(fieldX, 72.4, 13, 4.8, '');
+  box(fieldX, 72.4, 13, 4.8, F.terms, { align: 'center' });
   ink(8);
   doc.text('Days', fieldX + 14.5, 75.7);
-  box(fieldX + 25, 72.4, 13, 4.8, '');
+  box(fieldX + 25, 72.4, 13, 4.8, F.backToBack, { align: 'center' });
   ink(8);
   doc.text('Back-To-Back', fieldX + 39.5, 75.7);
-  tick(fieldX + 63, 72.4, true);
+  tick(fieldX + 63, 72.4, F.advance);
   ink(8);
   doc.text('Advance Payment', fieldX + 70, 75.7);
 
@@ -238,6 +258,8 @@ async function buildAdvicePDF (S) {
       filled(8);
       doc.text(F.invoiceNo, (cols[1] + cols[2]) / 2, y + 3.6, { align: 'center' });
       doc.text(F.received, (cols[2] + cols[3]) / 2, y + 3.6, { align: 'center' });
+      if (F.poNo) doc.text(F.poNo, (cols[3] + cols[4]) / 2, y + 3.6, { align: 'center' });
+      if (F.projectCode) doc.text(F.projectCode, (cols[4] + cols[5]) / 2, y + 3.6, { align: 'center' });
       doc.text('RM' + money(F.amount), cols[6] - 1.5, y + 3.6, { align: 'right' });
     }
     y += 5.4;
@@ -270,29 +292,29 @@ async function buildAdvicePDF (S) {
 
   ink(7.4);
   doc.text('Staff/ Consultant', labelX, 178.5);
-  box(fieldX, 175.2, 62, 5.5, '');
+  box(fieldX, 175.2, 62, 5.5, F.staff);
   italic(6.4);
   doc.text('- Attach TRF -', fieldX + 64, 178.5);
 
   /* the longest label on the sheet: a shade smaller so it clears the tick */
   ink(6.8);
   doc.text('Chargeable to Client', labelX, 186.9);
-  tick(fieldX, 183.6, false);
+  tick(fieldX, 183.6, F.chargeable === 'yes');
   ink(8);
   doc.text('Yes', fieldX + 7, 186.9);
-  tick(fieldX + 27, 183.6, false);
+  tick(fieldX + 27, 183.6, F.chargeable === 'no');
   ink(8);
   doc.text('No', fieldX + 34, 186.9);
 
   ink(7.4);
   doc.text('Account Manager', labelX, 195.3);
-  box(fieldX, 192, 62, 5.5, '');
+  box(fieldX, 192, 62, 5.5, F.manager);
 
   ink(7.4);
   doc.text('Cost Category', labelX, 203.8);
   // the sheet spaces these four tighter, and the last must clear the panel
   [['Cost of Sales', 0], ['Opex', 24], ['Fixed Asset', 41], ['Inventory', 64]].forEach(([text, dx]) => {
-    tick(fieldX + dx, 200.5, false);
+    tick(fieldX + dx, 200.5, F.category === text);
     ink(8);
     doc.text(text, fieldX + dx + 7, 203.8);
   });
@@ -330,6 +352,7 @@ async function buildAdvicePDF (S) {
   doc.setFillColor(255, 255, 255);
   doc.rect(ADV.whX + 26, 177.4, R - ADV.whX - 27.5, 4.6, 'FD');
   filled(7.3);
+  if (F.withholding) doc.text(String(F.withholding), ADV.whX + 27.5, 180.5);
   doc.text('%', R - 3, 180.5, { align: 'right' });
   ink(7.3);
   doc.text('Verified by:', ADV.whX + 1.5, 189.5);
