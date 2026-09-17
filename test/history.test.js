@@ -26,18 +26,21 @@ const record = {id:1,consultant:'Person <A>',period_month:1,period_year:2026,kin
 const wrap = ctx.historyTable([record,{...record,id:2,kind:'invoice'}]);
 // everybody on the roster gets a line, even with nothing filed
 const full = ctx.historyTable([record],['Zulkifli','Person <A>']);
-const fullBody = full.children[0].children[2];
+const fullBody = full.children[1].children[2];
 assert.equal(fullBody.children.length,2);
 assert.equal(fullBody.children[0].children[0].textContent,'Person <A>');
 assert.equal(fullBody.children[1].children[0].textContent,'Zulkifli');
 assert.equal(fullBody.children[1].children[1].children[0].textContent,'Not available');
-const body = wrap.children[0].children[2];
+const body = wrap.children[1].children[2];
 assert.equal(body.children.length,1);
-// name, three documents, and the month itself as one zip
-assert.equal(body.children[0].children.length,5);
+// name and three documents; the month's zip is the month's, on its heading
+assert.equal(body.children[0].children.length,4);
 assert.equal(body.children[0].children[0].textContent,'Person <A>');
-assert.equal(body.children[0].children[4].children[0].children[0].textContent,'Compile zip');
-const missing = ctx.historyTable([record]).children[0].children[2].children[0].children[2];
+const monthbar = wrap.children[0];
+assert.equal(monthbar.className,'history-monthbar');
+assert.equal(monthbar.children[0].children[0].textContent,'Compile month zip');
+assert.equal(monthbar.children[1].children[0].textContent,'Email Finance');
+const missing = ctx.historyTable([record]).children[1].children[2].children[0].children[2];
 assert.equal(missing.children[0].textContent,'Not available');
 // every document that is there says what it is called
 const cell = body.children[0].children[1];

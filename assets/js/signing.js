@@ -1837,58 +1837,114 @@ async function filedCopy (rec, kind) {
 }
 
 /**
- * Everything for one person and one month, compiled into one zip.
+ * Everything for one person and one month: the three documents, gathered.
  *
- * Three documents: the time sheet, the invoice and the payment advice. For
- * each one the signed copy on the record is taken if there is one, because a
- * signed scan is the document and the generated form is only a rendering of
- * it; where nothing was scanned back, the form is drawn from what was
- * approved so the month is still whole.
+ * For each one the signed copy on the record is taken if there is one,
+ * because a signed scan is the document and the generated form is only a
+ * rendering of it; where nothing was scanned back, the form is drawn from
+ * what was approved so the month is still whole.
+ *
+ * @returns {{ files: {name, bytes}[], missing: string[] }}
+ */
+async function gatherMonth (rec) {
+  /* The administrator compiles from History, a page that never loads the
+     submission list the PA's pages keep. Without it nothing could be drawn
+     and a month came out as its scans alone. */
+  if (!signingSubs.length) {
+    try { signingSubs = await Sync.submissions(''); } catch (err) { /* then only what is filed */ }
+  }
+  const files = [];
+  const missing = [];
+  const wanted = [['claim', 'the time sheet'], ['invoice', 'the invoice'], ['advice', 'the payment advice']];
+  for (const pair of wanted) {
+    const kind = pair[0];
+    try {
+      const filed = await filedCopy(rec, kind);
+      if (filed) { files.push(filed); continue; }
+    } catch (err) { /* fall through to drawing it */ }
+    const sub = monthSubmission(rec, kind);
+    if (!sub) { missing.push(pair[1]); continue; }
+    try {
+      files.push(await monthDocument(sub));
+    } catch (err) {
+      missing.push(pair[1]);
+    }
+  }
+  return { files: files, missing: missing };
+}
+
+/** the month as a folder is named: September 2026 */
+function monthFolder (rec) {
+  const m = Number(rec.period_month) || 0;
+  return `${MONTHS[Math.max(0, m - 1)]} ${rec.period_year || ''}`.trim();
+}
+
+/** hold a control while something long runs under it */
+function whileBusy (control, work) {
+  if (signingBusy) return Promise.resolve();
+  signingBusy = true;
+  if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
+  return work().finally(() => {
+    signingBusy = false;
+    if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
+  });
+}
+
+/**
+ * One person's month, as one zip.
  *
  * What is missing is said rather than quietly left out. A folder that is
  * quietly short a document is how somebody finds out a year later.
  */
-async function downloadMonthZip (rec, control) {
-  if (signingBusy) return;
-  signingBusy = true;
-  if (control) { control.disabled = true; control.setAttribute('aria-busy', 'true'); }
-  const files = [];
-  const missing = [];
-  try {
-    const wanted = [
-      ['claim', 'the time sheet'],
-      ['invoice', 'the invoice'],
-      ['advice', 'the payment advice']
-    ];
-    for (const pair of wanted) {
-      const kind = pair[0];
-      try {
-        const filed = await filedCopy(rec, kind);
-        if (filed) { files.push(filed); continue; }
-      } catch (err) { /* fall through to drawing it */ }
-      const sub = monthSubmission(rec, kind);
-      if (!sub) { missing.push(pair[1]); continue; }
-      try {
-        files.push(await monthDocument(sub));
-      } catch (err) {
-        missing.push(pair[1]);
-      }
-    }
+function downloadMonthZip (rec, control) {
+  return whileBusy(control, async () => {
+    const got = await gatherMonth(rec);
+    if (!got.files.length) { toast('Nothing could be gathered for that month.', true); return; }
+    saveAs(zipFiles(got.files), safeFile(`${monthFolder(rec)} - ${rec.consultant || 'Consultant'}`) + '.zip');
+    toast(got.missing.length
+      ? `${got.files.length} of 3 saved. Not in it: ${got.missing.join(', ')}.`
+      : 'All three documents saved as one zip.', !!got.missing.length);
+  });
+}
 
-    if (!files.length) {
-      toast('Nothing could be gathered for that month.', true);
-      return;
-    }
-    const m = Number(rec.period_month) || 0;
-    const when = `${MONTHS[Math.max(0, m - 1)]} ${rec.period_year || ''}`.trim();
-    saveAs(zipFiles(files), safeFile(`${when} - ${rec.consultant || 'Consultant'}`) + '.zip');
-    toast(missing.length
-      ? `${files.length} of 3 saved. Not in it: ${missing.join(', ')}.`
-      : 'All three documents saved as one zip.', !!missing.length);
-  } finally {
-    signingBusy = false;
-    if (control) { control.disabled = false; control.removeAttribute('aria-busy'); }
+/**
+ * Everybody's month, as one zip: a folder per person, three documents in
+ * each. The month is what Finance is sent, and it is one file — not one
+ * per person, and not one per document.
+ *
+ * Somebody with nothing at all in the month is left out rather than given
+ * an empty folder, and named in the toast so the omission is a known one.
+ *
+ * @param {object}   month  { period_year, period_month }
+ * @param {string[]} names  everybody who might have something in it
+ */
+async function compileMonth (month, names) {
+  const files = [];
+  const empty = [];
+  const short = [];
+  for (const name of names) {
+    const rec = { consultant: name, period_year: month.period_year, period_month: month.period_month };
+    const got = await gatherMonth(rec);
+    if (!got.files.length) { empty.push(name); continue; }
+    if (got.missing.length) short.push(`${name} (no ${got.missing.join(', no ')})`);
+    const folder = safeFile(name) || 'Consultant';
+    got.files.forEach(f => files.push({ name: folder + '/' + f.name, bytes: f.bytes }));
   }
+  return { files: files, empty: empty, short: short, with: names.filter(n => empty.indexOf(n) < 0) };
+}
+
+function downloadEveryoneZip (month, names, control) {
+  return whileBusy(control, async () => {
+    const got = await compileMonth(month, names);
+    if (!got.files.length) { toast('Nothing has been filed for that month by anybody yet.', true); return; }
+    saveAs(zipFiles(got.files), safeFile(monthFolder(month)) + '.zip');
+    const notes = [];
+    if (got.short.length) notes.push('Short a document: ' + got.short.join('; ') + '.');
+    if (got.empty.length) notes.push('Nothing yet for: ' + got.empty.join(', ') + '.');
+    toast(`${got.with.length} ${got.with.length === 1 ? 'person' : 'people'} in the zip. ` + notes.join(' '),
+          !!notes.length);
+    return got;
+  });
 }
 
 /* -------------------------------------------------------------------
@@ -1921,32 +1977,93 @@ function financeMonth (rec) {
   return `${MONTHS[Math.max(0, m - 1)]} ${rec.period_year || ''}`.trim();
 }
 
+/** the people a message goes to, as a mail header writes them */
+const FINANCE_NAMES = {
+  'adib.azman@uzmagroup.com': 'Muhammad Adib Zharif Mohd Azman',
+  'afizah.ariffin@uzmagroup.com': 'Afizah Ariffin',
+  'fadhli.jamaluddin@uzmagroup.com': 'Mohammad Fadhli Jamaluddin',
+  'aisya.abas@uzmagroup.com': 'Aisya Azizah Abas'
+};
+const mailAddress = addr => (FINANCE_NAMES[addr] ? `${FINANCE_NAMES[addr]} <${addr}>` : addr);
+
 /**
- * The message, as a mailto: link.
+ * The subject and the body, in the office's own words.
  *
- * Bare addresses rather than "Name <address>": mail clients disagree about
- * the second form inside a link and agree about the first. The body ends
- * at "Thank you." because the client adds the sender's own signature
- * block after it, and writing one here would put two on the message.
+ * The body ends at "Thank you." because the mail client adds the sender's
+ * own signature block after it, and writing one here would put two on the
+ * message. `rec.consultants` names everybody in the month; one name reads
+ * as "our Consultant (Kamaliah)", the way Finance already receives it.
  */
-function financeMailto (rec, project) {
-  const who = String(rec.consultant || '').trim().split(/\s+/)[0] || 'the consultant';
+function financeMessage (rec, project) {
+  const names = Array.isArray(rec.consultants) ? rec.consultants : [rec.consultant];
+  const firsts = names.map(n => String(n || '').trim().split(/\s+/)[0]).filter(Boolean);
+  const who = firsts.join(', ') || 'the consultant';
+  const plural = firsts.length > 1;
   const proj = project || FINANCE_MAIL.project;
-  const subject = `Payment Advice - ${proj} Consultant`;
-  const body = [
-    `Dear ${FINANCE_MAIL.dear},`,
+  return {
+    subject: `Payment Advice - ${proj} Consultant${plural ? 's' : ''}`,
+    body: [
+      `Dear ${FINANCE_MAIL.dear},`,
+      '',
+      `Please find the Payment Advice and related documents for ${financeMonth(rec)} payment ` +
+        `to our Consultant${plural ? 's' : ''} (${who}) for ${proj} project. ` +
+        'Kindly refer to the attachment for details.',
+      '',
+      'Appreciate your assistance on this.',
+      '',
+      'Thank you.'
+    ]
+  };
+}
+
+/** bytes as base64, folded at 76 columns the way a mail body wants it */
+function base64Lines (bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin).replace(/.{76}/g, '$&' + '\r\n');
+}
+
+/**
+ * The message as a file the mail client opens as a draft.
+ *
+ * A browser cannot attach a file to a message it did not send, and a
+ * mailto: link carries no attachment. An .eml can: it is the message
+ * itself, headers, body and the zip inside it, and with X-Unsent set
+ * Outlook opens it in a compose window rather than as something received
+ * — every field filled, the attachment on it, one click from Send.
+ */
+function financeEml (rec, project, zipName, zipBytes) {
+  const msg = financeMessage(rec, project);
+  const boundary = '----=_ccs_' + Date.now().toString(36);
+  const nl = '\r\n';
+  const head = [
+    'X-Unsent: 1',
+    'To: ' + FINANCE_MAIL.to.map(mailAddress).join(', '),
+    'Cc: ' + FINANCE_MAIL.cc.map(mailAddress).join(', '),
+    'Subject: ' + msg.subject,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ''
+  ];
+  const text = [
+    '--' + boundary,
+    'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: 8bit',
+    ''
+  ].concat(msg.body, ['']);
+  const file = [
+    '--' + boundary,
+    `Content-Type: application/zip; name="${zipName}"`,
+    `Content-Disposition: attachment; filename="${zipName}"`,
+    'Content-Transfer-Encoding: base64',
     '',
-    `Please find the Payment Advice and related documents for ${financeMonth(rec)} payment ` +
-      `to our Consultant (${who}) for ${proj} project. Kindly refer to the attachment for details.`,
-    '',
-    'Appreciate your assistance on this.',
-    '',
-    'Thank you.'
-  ].join('\r\n');
-  return 'mailto:' + FINANCE_MAIL.to.join(',') +
-    '?cc=' + encodeURIComponent(FINANCE_MAIL.cc.join(',')) +
-    '&subject=' + encodeURIComponent(subject) +
-    '&body=' + encodeURIComponent(body);
+    base64Lines(zipBytes),
+    '--' + boundary + '--',
+    ''
+  ];
+  return head.concat(text, file).join(nl);
 }
 
 /** the project the month was for, off the claim itself; the usual one if it does not say */
@@ -1960,12 +2077,30 @@ async function financeProject (rec) {
   } catch (err) { return ''; }
 }
 
-/** compile the month, then open the message it goes in */
-async function sendToFinance (rec, control) {
-  await downloadMonthZip(rec, control);
-  const project = await financeProject(rec);
-  window.location.href = financeMailto(rec, project);
-  toast('The zip is in your downloads. Attach it to the message that just opened.');
+/**
+ * Compile everybody's month, put it in the message, and hand the message
+ * over as a draft. Nothing is sent from here: the person opens the file,
+ * reads what is about to go, and presses Send in their own mail client.
+ */
+function sendMonthToFinance (month, names, control) {
+  return whileBusy(control, async () => {
+    const got = await compileMonth(month, names);
+    if (!got.files.length) { toast('Nothing has been filed for that month by anybody yet.', true); return; }
+    const zipName = safeFile(monthFolder(month)) + '.zip';
+    const zipBytes = new Uint8Array(await zipFiles(got.files).arrayBuffer());
+    const first = { consultant: got.with[0], period_year: month.period_year, period_month: month.period_month };
+    const project = await financeProject(first);
+    const rec = { consultants: got.with, period_year: month.period_year, period_month: month.period_month };
+    const eml = financeEml(rec, project, zipName, zipBytes);
+    saveAs(new Blob([eml], { type: 'message/rfc822' }),
+           safeFile(`${monthFolder(month)} - Payment Advice to Finance`) + '.eml');
+    const notes = [];
+    if (got.short.length) notes.push('Short a document: ' + got.short.join('; ') + '.');
+    if (got.empty.length) notes.push('Nothing yet for: ' + got.empty.join(', ') + '.');
+    toast('Open the .eml that just downloaded: it opens in Outlook as a draft to Finance with the ' +
+          `zip attached (${got.with.length} ${got.with.length === 1 ? 'person' : 'people'}). ` +
+          notes.join(' '), !!notes.length);
+  });
 }
 
 /* -------------------------------------------------------------------

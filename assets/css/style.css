@@ -859,6 +859,8 @@ body.locked > .sitefoot{display:none}
 .signingtable tr.signrow-under th,
 .signingtable tr.signrow-under td{border-top:none;padding-top:0}
 .signdoc-quiet .history-document-name{color:var(--muted);font-weight:600}
+/* the month's own buttons, on its heading in the administrator's record */
+.history-monthbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 /* the administrator's note on an empty duplicate profile's row */
 .dupnote{display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:12px;color:var(--muted);max-width:44ch}
 .dupnote .btn{align-self:flex-start}

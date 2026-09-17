@@ -383,9 +383,27 @@ function historyTable (records, roster) {
   const caption = document.createElement('caption');
   caption.textContent = month;
   table.appendChild(caption);
+
+  /* The month is what Finance is sent, and it is one file: a folder per
+     person, three documents in each, everybody at once. So the two buttons
+     are the month's, on its heading, and not a row's. The people are read
+     at click time, after the map below is built. */
+  const bar = document.createElement('div');
+  bar.className = 'history-monthbar';
+  const when = { period_year: first.period_year, period_month: first.period_month };
+  const everyone = () => [...people.keys()];
+  const zipAll = iconButton('download', `Compile every document for everybody in ${month} into one zip`,
+    'ghost small history-icon', control => downloadEveryoneZip(when, everyone(), control));
+  const zipWord = document.createElement('span'); zipWord.textContent = 'Compile month zip';
+  zipAll.appendChild(zipWord); bar.appendChild(zipAll);
+  const mail = iconButton('download', `Compile ${month} for everybody and open the e-mail to Finance`,
+    'ghost small history-icon', control => sendMonthToFinance(when, everyone(), control));
+  const mailWord = document.createElement('span'); mailWord.textContent = 'Email Finance';
+  mail.appendChild(mailWord); bar.appendChild(mail);
+  wrap.appendChild(bar);
   const head = document.createElement('thead');
   const titles = document.createElement('tr');
-  ['Consultant', 'Time Sheet', 'Invoice', 'Payment Advice', 'Month'].forEach(label => {
+  ['Consultant', 'Time Sheet', 'Invoice', 'Payment Advice'].forEach(label => {
     const cell = document.createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
@@ -483,29 +501,6 @@ function historyTable (records, roster) {
       row.appendChild(cell);
     });
 
-    /* And the month itself. Three documents produced weeks apart by three
-       people is not three downloads to anybody who was asked for
-       "September" — it is one folder, so it is one button. */
-    const whole = document.createElement('td');
-    whole.setAttribute('data-label', 'Month');
-    const anchor = copies.filter(r => r.kind === 'claim')[0] || copies[0] ||
-      { consultant: name, period_year: first.period_year, period_month: first.period_month };
-    const zip = iconButton('download',
-      `Compile every document for ${name}, ${month}, into one zip`,
-      'ghost small history-icon', control => downloadMonthZip(anchor, control));
-    const zipWord = document.createElement('span');
-    zipWord.textContent = 'Compile zip';
-    zip.appendChild(zipWord);
-    whole.appendChild(zip);
-    /* And where the folder goes: compiled the same way, then handed to a
-       message already addressed to Finance. */
-    const mail = iconButton('download', `Compile ${name}, ${month}, and open the e-mail to Finance`,
-      'ghost small history-icon', control => sendToFinance(anchor, control));
-    const mailWord = document.createElement('span');
-    mailWord.textContent = 'Email Finance';
-    mail.appendChild(mailWord);
-    whole.appendChild(mail);
-    row.appendChild(whole);
 
     body.appendChild(row);
   });

@@ -805,9 +805,11 @@ check('and the two are separate steps, in the order the job happens',
     .test(appjs), true);
 /* Three documents produced weeks apart is one folder to anybody who was
    asked for "September", so the administrator's record compiles one. */
-check('the administrator compiles a month into one zip',
-  /Compile zip/.test(archivejs) &&
-  /downloadMonthZip\(anchor, control\)/.test(archivejs) &&
+check('the administrator compiles a month into one zip, everybody at once',
+  /Compile month zip/.test(archivejs) &&
+  /downloadEveryoneZip\(when, everyone\(\), control\)/.test(archivejs) &&
+  /async function compileMonth/.test(signingjs) &&
+  /name: folder \+ '\/' \+ f\.name/.test(signingjs) &&
   /async function filedCopy/.test(signingjs), true);
 /* The month goes to Accounts Payable by e-mail. A browser cannot attach a
    file to a message it did not send, so the app does the two things it can:
@@ -829,9 +831,11 @@ check('the note is on the PA’s tables and the Status table alike',
   /const dup = duplicateProfileNote\(name, \(\) => \{/.test(signingjs) &&
   /duplicateProfileNote\(name, \(\) => renderApprovals\(\)\)/.test(approvals), true);
 check('the administrator sends a month to Finance',
-  /Email Finance/.test(archivejs) && /sendToFinance\(anchor, control\)/.test(archivejs) &&
+  /Email Finance/.test(archivejs) && /sendMonthToFinance\(when, everyone\(\), control\)/.test(archivejs) &&
   /const FINANCE_MAIL = /.test(signingjs) && /adib\.azman@uzmagroup\.com/.test(signingjs) &&
-  /window\.location\.href = financeMailto\(rec, project\)/.test(signingjs), true);
+  /function financeEml/.test(signingjs) && /'X-Unsent: 1'/.test(signingjs) &&
+  /Content-Disposition: attachment; filename=/.test(signingjs) &&
+  /type: 'message\/rfc822'/.test(signingjs), true);
 check('and it prefers the signed copy over a redrawn one',
   /const filed = await filedCopy\(rec, kind\);[\s\S]{0,80}files\.push\(filed\)/
     .test(signingjs), true);
