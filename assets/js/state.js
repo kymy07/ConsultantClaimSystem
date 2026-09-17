@@ -94,8 +94,14 @@ function defaultState () {
        twelve days each unless the administrator agreed otherwise. It lives
        with the profile because it belongs to the person, and it travels with
        the claim so an approver reads the same numbers the consultant did. */
+    /* `opening` is what was taken before this app knew about it: leave from
+       a month that was never submitted here, or from before the person's
+       first claim. The sheet cannot work it out — nothing it can read says
+       so — and without it a balance is wrong for anybody who did not start
+       in January. The administrator sets it, and it is per year. */
     leave: { year: now.getFullYear(), pto: 0, mc: 0, ul: 0, counted: {},
-             allowance: { pto: LEAVE_LIMITS.PTO, mc: LEAVE_LIMITS.MC } }
+             allowance: { pto: LEAVE_LIMITS.PTO, mc: LEAVE_LIMITS.MC },
+             opening: { year: now.getFullYear(), pto: 0, mc: 0, ul: 0 } }
   };
 }
 
@@ -279,11 +285,26 @@ function monthLeaveCounts (ts) {
  * existed carries three running totals instead, and those are read as the
  * year's balance so an old profile is not silently reset to zero.
  */
+/**
+ * Days of this taken before the app was keeping count, for the sheet's year.
+ *
+ * Nought unless somebody set it, and nought for a year it was not set for:
+ * an opening balance is a statement about one year, and carrying it into
+ * the next would quietly spend an allowance nobody had touched.
+ */
+function leaveOpening (S, mark) {
+  const o = ((S && S.leave) || {}).opening;
+  if (!o || Number(o.year) !== Number((S.timesheet || {}).year)) return 0;
+  const n = Math.floor(Number(o[LEAVE_KEYS[mark]]));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 function carriedLeave (S, mark) {
   const ts = S.timesheet;
   const L = S.leave || {};
   const here = monthKey(ts.year, ts.month);
   const counted = L.counted;
+  const opening = leaveOpening(S, mark);
 
   if (counted && typeof counted === 'object' && Object.keys(counted).length) {
     let n = 0;
@@ -292,10 +313,10 @@ function carriedLeave (S, mark) {
       if (Number(String(k).slice(0, 4)) !== ts.year) return;   // another year
       n += Math.max(0, Number((counted[k] || {})[LEAVE_KEYS[mark]]) || 0);
     });
-    return n;
+    return n + opening;
   }
   // a balance carried from another year is not this year's balance
-  return (L.year === ts.year) ? Math.max(0, Number(L[LEAVE_KEYS[mark]]) || 0) : 0;
+  return ((L.year === ts.year) ? Math.max(0, Number(L[LEAVE_KEYS[mark]]) || 0) : 0) + opening;
 }
 
 /**

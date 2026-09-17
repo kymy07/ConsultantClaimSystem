@@ -398,8 +398,12 @@ function renderLeave (S, hostId) {
   if (!host) return;
   const ts = S.timesheet;
 
+  /* What the submitted months come to, on their own. `carriedLeave` counts
+     the administrator's opening balance in with them — that is what a
+     balance is — but this line names where the days came from, and saying
+     a figure somebody typed came "from submitted months" would be wrong. */
   const carried = LEAVE_KINDS
-    .map(mark => ({ mark: mark, n: carriedLeave(S, mark) }))
+    .map(mark => ({ mark: mark, n: carriedLeave(S, mark) - leaveOpening(S, mark) }))
     .filter(x => x.n > 0);
 
   /* The allowance is said rather than assumed, because it is no longer the
@@ -431,11 +435,21 @@ function renderLeave (S, hostId) {
       </div>
     </details>` : ''}`;
 
+  const opening = LEAVE_KINDS
+    .map(mark => ({ mark: mark, n: leaveOpening(S, mark) }))
+    .filter(x => x.n > 0);
+  const said = [];
+  if (carried.length) {
+    said.push('From submitted months: ' + carried.map(x => `${x.n} ${x.mark}`).join(', ') + '.');
+  }
+  /* Said apart from the rest, because it is the one figure on this card
+     nobody can check against a submitted month. */
+  if (opening.length) {
+    said.push('Set by the administrator as taken earlier: ' +
+              opening.map(x => `${x.n} ${x.mark}`).join(', ') + '.');
+  }
   const foot = host.querySelector('.leavefoot');
-  foot.textContent = carried.length
-    ? 'From submitted months: ' +
-      carried.map(x => `${x.n} ${x.mark}`).join(', ') + '.'
-    : `No leave carried forward in ${ts.year}.`;
+  foot.textContent = said.length ? said.join(' ') : `No leave carried forward in ${ts.year}.`;
 
   mountLeaveAllowance(S, host);
 
@@ -444,12 +458,19 @@ function renderLeave (S, hostId) {
 }
 
 /**
- * The two boxes the administrator sets, on the card that shows what they do.
+ * The boxes the administrator sets, on the card that shows what they do.
  *
- * They are on this card rather than buried with the other administered
- * fields because this is where the number is read: somebody looking at "3
- * left" is the person who wants to know it should have been 18. Everybody
- * else reads the sentence above and sees no boxes at all.
+ * Two rows, because there are two different questions on this card and
+ * neither can be worked out from the sheet. How many days a year the person
+ * is on is their terms. How many they had already taken when this app
+ * started counting is history — leave from a month that was never submitted
+ * here, or from before their first claim — and without it a balance is
+ * wrong for anybody who did not start in January.
+ *
+ * They are here rather than buried with the other administered fields
+ * because this is where the numbers are read: somebody looking at "3 left"
+ * is the person who wants to know it should have been 18. Everybody else
+ * reads the sentence above and sees no boxes at all.
  */
 function mountLeaveAllowance (S, host) {
   const bar = host.querySelector('.leaveset');
@@ -457,48 +478,69 @@ function mountLeaveAllowance (S, host) {
   bar.hidden = false;
   bar.innerHTML = '';
 
-  const said = document.createElement('span');
-  said.className = 'leaveset-said';
-  said.textContent = 'Days a year for this person:';
-  bar.appendChild(said);
+  /* Only on change, not on every keystroke: a half-typed "1" of "18" would
+     otherwise cut the figure to one and repaint the card underneath the
+     cursor. A number that will not do is put back rather than argued with. */
+  const boxes = (words, marks, read, write) => {
+    const row = document.createElement('div');
+    row.className = 'leaveset-row';
+    const label = document.createElement('span');
+    label.className = 'leaveset-said';
+    label.textContent = words;
+    row.appendChild(label);
 
-  [['PTO', 'pto'], ['MC', 'mc']].forEach(pair => {
-    const mark = pair[0];
-    const key = pair[1];
-    const label = document.createElement('label');
-    const tag = document.createElement('span');
-    tag.className = 'lmark ' + MARKS[mark];
-    tag.textContent = mark;
-    label.appendChild(tag);
+    marks.forEach(mark => {
+      const wrap = document.createElement('label');
+      const tag = document.createElement('span');
+      tag.className = 'lmark ' + MARKS[mark];
+      tag.textContent = mark;
+      wrap.appendChild(tag);
 
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '0';
-    input.max = String(LEAVE_MAX);
-    input.step = '1';
-    input.value = String(leaveAllowance(S, mark));
-    input.setAttribute('aria-label', LEAVE_NAMES[mark] + ', days a year');
-    /* Only on change, not on every keystroke: half-typed "1" of "18" would
-       otherwise cut the allowance to one and repaint the card underneath the
-       cursor. */
-    input.addEventListener('change', () => {
-      const n = Math.floor(Number(input.value));
-      if (!Number.isFinite(n) || n < 0 || n > LEAVE_MAX) {
-        input.value = String(leaveAllowance(S, mark));
-        return;
-      }
-      S.leave = S.leave || {};
-      S.leave.allowance = Object.assign({}, S.leave.allowance);
-      S.leave.allowance[key] = n;
-      leaveAllowanceChanged(S);
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = String(LEAVE_MAX);
+      input.step = '1';
+      input.value = String(read(mark));
+      input.setAttribute('aria-label', `${LEAVE_NAMES[mark]}, ${words.replace(/:$/, '')}`);
+      input.addEventListener('change', () => {
+        const n = Math.floor(Number(input.value));
+        if (!Number.isFinite(n) || n < 0 || n > LEAVE_MAX) {
+          input.value = String(read(mark));
+          return;
+        }
+        write(mark, n);
+        leaveAllowanceChanged(S);
+      });
+      wrap.appendChild(input);
+      row.appendChild(wrap);
     });
-    label.appendChild(input);
-    bar.appendChild(label);
-  });
+    bar.appendChild(row);
+  };
+
+  boxes('Days a year for this person:', ['PTO', 'MC'],
+        mark => leaveAllowance(S, mark),
+        (mark, n) => {
+          S.leave = S.leave || {};
+          S.leave.allowance = Object.assign({}, S.leave.allowance);
+          S.leave.allowance[LEAVE_KEYS[mark]] = n;
+        });
+
+  /* Unpaid leave is here too. It has no allowance to spend, but it is
+     counted and shown, and a year that began part-way through should say
+     so for all three. */
+  boxes(`Already taken in ${S.timesheet.year}, before this app:`, LEAVE_KINDS,
+        mark => leaveOpening(S, mark),
+        (mark, n) => {
+          S.leave = S.leave || {};
+          S.leave.opening = Object.assign({ year: S.timesheet.year },
+                                          S.leave.opening, { year: S.timesheet.year });
+          S.leave.opening[LEAVE_KEYS[mark]] = n;
+        });
 
   const note = document.createElement('span');
   note.className = 'leaveset-note';
-  note.textContent = 'Saved with the profile.';
+  note.textContent = 'Saved with the profile. The months already submitted are counted on top.';
   bar.appendChild(note);
 }
 

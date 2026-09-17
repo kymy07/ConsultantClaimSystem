@@ -323,10 +323,11 @@ label.check input{width:auto}
 
 /* the administrator's two boxes on the leave card: what this person is on */
 .leaveset{
-  display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:8px;
   margin:0 14px 12px;padding:10px 12px;border:1px solid var(--line);
   border-radius:8px;background:#fff
 }
+.leaveset-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .leaveset[hidden]{display:none}
 .leaveset-said{font-size:12px;font-weight:600;color:var(--navy)}
 .leaveset label{display:flex;flex-direction:row;align-items:center;gap:6px;margin:0}

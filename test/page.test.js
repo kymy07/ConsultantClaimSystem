@@ -640,6 +640,18 @@ check('twelve days is still what everybody is on until it is changed',
 check('unpaid leave is never capped, whatever is stored against it',
   /if \(typeof LEAVE_LIMITS\[mark\] !== 'number'\) return null;/.test(statejs) &&
   /if \(leaveAllowance\(S, mark\) === null\) return true;/.test(statejs), true);
+/* The other figure on that card nobody can work out from the sheet: days
+   taken before this app was counting — a month never submitted here, or
+   before the person's first claim. Without it a balance is wrong for
+   anybody who did not start in January. */
+check('the administrator can also set what was taken before this app',
+  /function leaveOpening/.test(statejs) &&
+  /Number\(o\.year\) !== Number\(\(S\.timesheet \|\| \{\}\)\.year\)\) return 0;/.test(statejs) &&
+  /return n \+ opening;/.test(statejs) &&
+  /Already taken in \$\{S\.timesheet\.year\}, before this app:/.test(tsjs), true);
+check('and it is said apart from what the submitted months come to',
+  /carriedLeave\(S, mark\) - leaveOpening\(S, mark\)/.test(tsjs) &&
+  /Set by the administrator as taken earlier: /.test(tsjs), true);
 check('only the administrator sees the boxes that set it',
   /function mountLeaveAllowance/.test(tsjs) &&
   /!Auth\.setsNumbering\(\)\) return;/.test(tsjs), true);
