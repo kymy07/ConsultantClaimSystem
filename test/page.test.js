@@ -692,6 +692,13 @@ check('and drawn from the invoice wherever it is asked for',
   /if \(!sub && kind === 'advice'\)/.test(signingjs) &&
   /await Sync\.updateData\(adviceOpen\.advice\.id, state\)/.test(signingjs) &&
   /updateData: updateSubmissionData/.test(syncjs), true);
+/* The Download step's View on the advice line opened the invoice, and
+   offered it before the HOD had approved anything. It shows the advice,
+   and only once there is one. */
+check("the Download step's advice View shows the advice, not the invoice",
+  /advice \|\| \(ready \? paidInvoice : null\)/.test(signingjs) &&
+  /kind === 'advice'\s*\? previewAdviceFor\(/.test(signingjs) &&
+  !/reviewSubmission\(target\.id\)|reviewSubmission\(ready\.id\)/.test(signingjs), true);
 check('and every sent invoice is on the table, saying where it has got',
   /function invoicesSubmitted[\s\S]{0,200}kindOf\(s\) === 'invoice'/.test(signingjs) &&
   !/function invoicesApproved/.test(signingjs), true);

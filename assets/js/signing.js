@@ -545,25 +545,34 @@ function downloadLine (name, month, kind, claim) {
   const ready = kind === 'claim' ? (printable(doc) ? doc : null)
     : printable(advice) ? advice
       : (adviceUnlocked(paidInvoice) ? paidInvoice : null);
-  const target = kind === 'claim' ? doc : (advice || paidInvoice);
+  /* An invoice the HOD has not approved has no advice behind it yet, so
+     there is nothing on this line to look at: the invoice is the other
+     step's document, and showing it here passed it off as the advice. */
+  const target = kind === 'claim' ? doc : (advice || (ready ? paidInvoice : null));
 
   const words = kind === 'claim'
     ? sheetStatusWords(name, month.y, month.m)
     : advice ? adviceWords(advice)
       : adviceUnlocked(paidInvoice) ? 'Ready to download' : 'Not written yet';
 
+  // the advice is drawn as an advice, even when it is only the invoice's figures
+  const view = (sub, control) => kind === 'advice'
+    ? previewAdviceFor(paidInvoice || monthInvoice(name, month.y, month.m) || sub,
+                       advice, control)
+    : reviewSubmission(sub.id);
+
   if (!ready) {
     const closed = target && target.status === 'complete';
     const quiet = signingDocument(label, closed ? 'Signed and filed' : 'Not ready to print yet',
       target ? [labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
-                             () => reviewSubmission(target.id))] : []);
+                             control => view(target, control))] : []);
     quiet.classList.add('signdoc-quiet');
     return [quiet, statusBadge(words)];
   }
 
   return [signingDocument(label, ready.invoice_no || '', [
     labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
-                 () => reviewSubmission(ready.id)),
+                 control => view(ready, control)),
     labelledIcon('download', 'Download', `Download the ${label.toLowerCase()} for ${who}`,
                  control => downloadForSigning(ready, control, kind))
   ]), statusBadge(words)];
