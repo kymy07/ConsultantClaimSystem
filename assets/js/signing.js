@@ -553,7 +553,7 @@ function downloadLine (name, month, kind, claim) {
   const words = kind === 'claim'
     ? sheetStatusWords(name, month.y, month.m)
     : advice ? adviceWords(advice)
-      : adviceUnlocked(paidInvoice) ? 'Ready to download' : 'Not written yet';
+      : adviceUnlocked(paidInvoice) ? 'Ready to download' : 'Not approved yet by HOD';
 
   // the advice is drawn as an advice, even when it is only the invoice's figures
   const view = (sub, control) => kind === 'advice'
@@ -767,7 +767,13 @@ function uploadWaitingWords (row, kind) {
     return sheetStatusWords(row.consultant, Number(row.period_year), Number(row.period_month));
   }
   const a = adviceFor(row);
-  if (!a) return 'Not written yet';
+  /* No advice is written until the HOD approves the invoice it pays, so
+     until then that is what it is waiting for. After, it is ready as it is. */
+  if (!a) {
+    return adviceUnlocked(monthInvoice(row.consultant, Number(row.period_year),
+                                       Number(row.period_month)))
+      ? 'Ready to download' : 'Not approved yet by HOD';
+  }
   if (a.status === 'complete') return 'Closed';
   return adviceWords(a);
 }
