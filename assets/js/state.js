@@ -302,9 +302,10 @@ function monthLeaveCounts (ts) {
  * an opening balance is a statement about one year, and carrying it into
  * the next would quietly spend an allowance nobody had touched.
  */
-function leaveOpening (S, mark) {
+function leaveOpening (S, mark, year) {
   const o = ((S && S.leave) || {}).opening;
-  if (!o || Number(o.year) !== Number((S.timesheet || {}).year)) return 0;
+  const y = year != null ? Number(year) : Number((S.timesheet || {}).year);
+  if (!o || Number(o.year) !== y) return 0;
   const n = Math.floor(Number(o[LEAVE_KEYS[mark]]));
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
@@ -382,6 +383,101 @@ function leaveStanding (S, mark) {
     left: capped ? limit - taken : null,
     over: capped ? taken > limit : false
   };
+}
+
+/**
+ * Where one kind of leave stands on the record for a year: the months that
+ * were sent, and the opening balance. Not whatever grid happens to be open.
+ *
+ * leaveStanding() is the sheet's question — "if I send this month as it is,
+ * where am I?" — and it rightly counts the grid on screen. A profile card
+ * asks something else: where does this person stand. Answered with
+ * leaveStanding(), the card counted whichever month was last left in that
+ * browser's copy of the profile, sent or not: a September sent from the
+ * consultant's own laptop was nowhere in it, and a day marked on a draft
+ * that never went was.
+ *
+ * `from` names the months the days came from, so a surprising figure can
+ * be read off the card rather than argued about.
+ */
+function leaveOnRecord (S, mark, year) {
+  const L = (S && S.leave) || {};
+  const y = Number(year);
+  const key = LEAVE_KEYS[mark];
+  const counted = L.counted && typeof L.counted === 'object' ? L.counted : {};
+  const opening = leaveOpening(S, mark, y);
+  let from = [];
+  let taken;
+  if (Object.keys(counted).length) {
+    from = Object.keys(counted)
+      .filter(k => Number(String(k).slice(0, 4)) === y)
+      .sort()
+      .map(k => ({ month: k, days: Math.max(0, Number((counted[k] || {})[key]) || 0) }))
+      .filter(x => x.days > 0);
+    taken = from.reduce((t, x) => t + x.days, 0) + opening;
+  } else {
+    // a profile from before months were filed carries running totals instead
+    taken = (Number(L.year) === y ? Math.max(0, Number(L[key]) || 0) : 0) + opening;
+  }
+  const limit = leaveAllowance(S, mark);
+  const capped = limit !== null;
+  return {
+    mark: mark, name: LEAVE_NAMES[mark], year: y, taken: taken, opening: opening, from: from,
+    limit: capped ? limit : null,
+    left: capped ? limit - taken : null,
+    over: capped ? taken > limit : false
+  };
+}
+
+/**
+ * The leave a person's sent time sheets hold, month by month.
+ *
+ * Given the forms themselves, newest first, it takes each month once — the
+ * newest copy, which is the one a resubmission replaced the first with — and
+ * counts what that sheet marks. This is the record: what somebody actually
+ * sent, rather than what one browser remembered them sending.
+ *
+ * @param {Array<{consultant:string, data:object}>} forms newest first
+ * @returns {Object<string, Object<string, {pto,mc,ul}>>} person → month → counts
+ */
+function leaveFromSheets (forms) {
+  const out = {};
+  (forms || []).forEach(f => {
+    const who = String((f && f.consultant) || '').trim();
+    const ts = f && f.data && f.data.timesheet;
+    if (!who || !ts || ts.year == null || ts.month == null) return;
+    const month = monthKey(Number(ts.year), Number(ts.month));
+    out[who] = out[who] || {};
+    if (!out[who][month]) out[who][month] = monthLeaveCounts(ts);
+  });
+  return out;
+}
+
+/**
+ * Put what was sent onto what a browser remembers.
+ *
+ * A month on the record replaces the same month here. And for a year with
+ * anything on the record at all, a month here that the record does not have
+ * is dropped: it was filed from a claim that no longer exists — a test row
+ * taken off while this was being set up, or a claim deleted since — and
+ * leaving it is how a day of unpaid leave nobody took stays on a card.
+ * A year with nothing on the record is left exactly as it is, because that
+ * says nothing: the documents may be filed under another spelling.
+ *
+ * @returns {boolean} whether anything changed
+ */
+function applyLeaveRecord (S, months) {
+  if (!S || !months) return false;
+  if (!S.leave || typeof S.leave !== 'object') return false;
+  const before = JSON.stringify(S.leave.counted || {});
+  const counted = Object.assign({}, S.leave.counted || {});
+  const years = new Set(Object.keys(months).map(k => String(k).slice(0, 4)));
+  Object.keys(counted).forEach(k => {
+    if (years.has(String(k).slice(0, 4)) && !months[k]) delete counted[k];
+  });
+  Object.keys(months).forEach(k => { counted[k] = Object.assign({}, months[k]); });
+  S.leave.counted = counted;
+  return JSON.stringify(counted) !== before;
 }
 
 /** every kind of leave, in the order they appear on the sheet */

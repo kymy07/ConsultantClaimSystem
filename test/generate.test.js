@@ -399,6 +399,54 @@ vm.runInContext(`
     who(`profileFiledName('Someone New', { consultant: { name: '  ' } })`), 'Someone New');
 
   /* -----------------------------------------------------------------------
+     Leave on record. The sent time sheets are the record: each month once,
+     the newest copy, and a browser's own memory of it put right from them.
+     ----------------------------------------------------------------------- */
+  console.log('\nLeave on record');
+  const lv = expr => vm.runInContext(expr, ctx);
+  lv(`
+    globalThis.__sheet = (y, m, marks) => {
+      const t = defaultState().timesheet;
+      t.year = y; t.month = m;
+      Object.keys(marks).forEach(d => { t.activities[0].days[d] = marks[d]; });
+      return t;
+    };
+    /* newest first, as the list is sorted: a resubmitted September with one
+       PTO, then the first September with two, then August */
+    globalThis.__rec = leaveFromSheets([
+      { consultant: 'Anir Syazwan bin Sharbirin', data: { timesheet: __sheet(2026, 8, { 4: 'PTO', 10: 'MC' }) } },
+      { consultant: 'Anir Syazwan bin Sharbirin', data: { timesheet: __sheet(2026, 8, { 4: 'PTO', 5: 'PTO' }) } },
+      { consultant: 'Anir Syazwan bin Sharbirin', data: { timesheet: __sheet(2026, 7, { 12: 'MC' }) } }
+    ]);
+  `);
+  check('a month on record is its newest copy',
+    lv(`__rec['Anir Syazwan bin Sharbirin']['2026-09'].pto`), 1);
+  check('with every kind of leave it marks',
+    lv(`__rec['Anir Syazwan bin Sharbirin']['2026-09'].mc`), 1);
+
+  lv(`
+    /* what the administrator's browser held: nothing for September, and a
+       day of unpaid leave filed from a claim that was taken off since */
+    globalThis.__card = defaultState();
+    __card.leave.counted = { '2026-06': { pto: 0, mc: 0, ul: 1 } };
+    globalThis.__moved = applyLeaveRecord(__card, __rec['Anir Syazwan bin Sharbirin']);
+  `);
+  check('what was sent is put onto the card', lv('__moved'), true);
+  check('and PTO comes off', lv(`leaveOnRecord(__card, 'PTO', 2026).left`), 11);
+  check('and MC comes off, both months of it', lv(`leaveOnRecord(__card, 'MC', 2026).left`), 10);
+  check('a month with no claim behind it is not counted',
+    lv(`leaveOnRecord(__card, 'UL', 2026).taken`), 0);
+  check('the card says where the days came from',
+    lv(`leaveOnRecord(__card, 'MC', 2026).from.map(x => x.month).join()`), '2026-08,2026-09');
+  lv(`
+    globalThis.__other = defaultState();
+    __other.leave.counted = { '2025-03': { pto: 2, mc: 0, ul: 0 } };
+    applyLeaveRecord(__other, { '2026-09': { pto: 1, mc: 0, ul: 0 } });
+  `);
+  check('a year with nothing on record is left as it was',
+    lv(`__other.leave.counted['2025-03'].pto`), 2);
+
+  /* -----------------------------------------------------------------------
      The payment advice. It is the office's own form and every box on it can
      be typed over, so what has to hold is that it opens as the invoice it
      pays, and that what somebody typed is what comes out the other end.

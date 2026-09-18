@@ -1093,6 +1093,73 @@ function afterSubmitted () {
   persist();
 }
 
+/**
+ * Bring every profile this browser holds up to date with what was sent.
+ *
+ * A month's leave was filed on the profile in whichever browser sent the
+ * claim, and only there: this browser kept its own copy of that profile, and
+ * a shared copy never replaces one already here. So a consultant who sent
+ * September from their own laptop had it counted on their laptop, and every
+ * other card for them — the administrator's, the PA's — still said PTO 12.
+ *
+ * The sent time sheets are the record, and every browser can read the ones
+ * it is allowed to: the office reads all of them, a consultant their own. So
+ * each browser reads them here, once, and files what they hold onto its own
+ * copies. It fixes the other two ways a card went wrong as well — a claim
+ * resubmitted with different days, and a month filed from a claim that was
+ * later taken off.
+ *
+ * @returns {Promise<boolean>} whether any card needs drawing again
+ */
+const LEAVE_SHEETS_MAX = 80;
+async function reconcileLeave () {
+  if (!Sync.on) return false;
+  let rows;
+  try { rows = await Sync.submissions(''); } catch (err) { return false; }
+  const thisYear = new Date().getFullYear();
+  const sheets = (rows || [])
+    .filter(r => {
+      const kind = Sync.kindOf(r);
+      return (kind === 'claim' || !kind) && Number(r.period_year) >= thisYear - 1;
+    })
+    .sort((a, b) => String(b.updated_at || b.created_at || '')
+      .localeCompare(String(a.updated_at || a.created_at || '')))
+    .slice(0, LEAVE_SHEETS_MAX);
+
+  /* One read per sheet, because the list carries no form. A few at a time:
+     the office has a year of these, and a browser is not a batch job. */
+  const forms = [];
+  for (let i = 0; i < sheets.length; i += 6) {
+    const got = await Promise.all(sheets.slice(i, i + 6).map(r =>
+      Sync.submission(r.id).catch(() => null)));
+    got.forEach((full, j) => {
+      if (!full || !full.data || Sync.kindOf(full) !== 'claim') return;
+      forms.push({ consultant: full.consultant || sheets[i + j].consultant, data: full.data });
+    });
+  }
+  const byPerson = leaveFromSheets(forms);
+
+  let changed = false;
+  const all = Store.profiles();
+  Object.keys(all).forEach(key => {
+    const months = byPerson[profileFiledName(key, all[key])];
+    if (!months) return;
+    const p = mergeDefaults(all[key]);
+    if (applyLeaveRecord(p, months)) {
+      /* Kept here, not sent: every browser reads the record for itself, and
+         this is a copy of it, not a decision anybody made. */
+      Store.saveProfile(key, p);
+      changed = true;
+    }
+  });
+  const mine = byPerson[String(S.consultant.name || '').trim()];
+  if (mine && applyLeaveRecord(S, mine)) {
+    persist();
+    changed = true;
+  }
+  return changed;
+}
+
 /* ---------------- persistence ---------------- */
 
 let saveTimer = null;
@@ -1445,6 +1512,12 @@ function boot () {
     if (r.adopted)     toast('Loaded the draft saved from your other device.');
     else if (r.gained) toast(`${r.gained} shared profile(s) loaded.`);
     refreshProfileList();
+    // the leave on every card, from what was actually sent
+    reconcileLeave().then(changed => {
+      if (!changed) return;
+      renderProfileCards();
+      if (typeof renderLeave === 'function') renderTimesheet(S, afterTimesheetChange);
+    });
     // the probe is what decides whether a claim can be sent at all, and it
     // answers after the first paint
     renderSubmitStep();
@@ -1698,15 +1771,22 @@ function renderProfileCards () {
     // the balance is the thing people open a profile to find out
     const chips = document.createElement('span');
     chips.className = 'pchips';
-    leaveStandings(p).forEach(L => {
+    /* The year that is running, from what has been sent. Not the grid left
+       in this browser's copy: that is a draft, or last month, or somebody
+       else's afternoon, and a card is asked where a person stands. */
+    const year = new Date().getFullYear();
+    LEAVE_KINDS.map(mark => leaveOnRecord(p, mark, year)).forEach(L => {
       const chip = document.createElement('i');
       chip.className = 'pchip ' + MARKS[L.mark] + (L.over ? ' over' : '');
       // a capped kind shows what is left, because that is the question;
       // an uncapped one has no answer to that, so it shows what was taken
       chip.textContent = L.limit == null ? `${L.mark} ${L.taken}` : `${L.mark} ${L.left}`;
+      const where = L.from.map(x => `${MON3[Number(x.month.slice(5)) - 1]} ${x.days}`)
+        .concat(L.opening ? [`before this app ${L.opening}`] : []);
+      const said = where.length ? ` (${where.join(', ')})` : '';
       chip.title = L.limit == null
-        ? `${L.name}: ${L.taken} taken in ${p.timesheet.year} — no yearly allowance`
-        : `${L.name}: ${L.taken} of ${L.limit} taken in ${p.timesheet.year}, ${L.left} left`;
+        ? `${L.name}: ${L.taken} taken in ${year}${said} — no yearly allowance`
+        : `${L.name}: ${L.taken} of ${L.limit} taken in ${year}${said}, ${L.left} left`;
       chips.appendChild(chip);
     });
     card.appendChild(chips);

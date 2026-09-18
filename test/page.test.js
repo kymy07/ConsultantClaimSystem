@@ -743,9 +743,21 @@ check('unpaid leave is never capped, whatever is stored against it',
    anybody who did not start in January. */
 check('the administrator can also set what was taken before this app',
   /function leaveOpening/.test(statejs) &&
-  /Number\(o\.year\) !== Number\(\(S\.timesheet \|\| \{\}\)\.year\)\) return 0;/.test(statejs) &&
+  /const y = year != null \? Number\(year\) : Number\(\(S\.timesheet \|\| \{\}\)\.year\);\s*if \(!o \|\| Number\(o\.year\) !== y\) return 0;/.test(statejs) &&
   /return n \+ opening;/.test(statejs) &&
   /Already taken in \$\{S\.timesheet\.year\}, before this app:/.test(tsjs), true);
+/* A card is asked where a person stands, and answered it from whichever
+   grid was last left in that browser's copy of the profile: September sent
+   from the consultant's own laptop was not in it, and a day marked on a
+   draft that never went was. It reads the record now — the sent sheets —
+   and every browser brings its copies up to date from them. */
+check('a profile card is the balance on record, not the grid left open',
+  /LEAVE_KINDS\.map\(mark => leaveOnRecord\(p, mark, year\)\)/.test(appjs) &&
+  !/leaveStandings\(p\)/.test(appjs) &&
+  /async function reconcileLeave/.test(appjs) &&
+  /reconcileLeave\(\)\.then\(changed =>/.test(appjs), true);
+check('and it says which months the days came from',
+  /const where = L\.from\.map/.test(appjs), true);
 check('and it is said apart from what the submitted months come to',
   /carriedLeave\(S, mark\) - leaveOpening\(S, mark\)/.test(tsjs) &&
   /Set by the administrator as taken earlier: /.test(tsjs), true);
