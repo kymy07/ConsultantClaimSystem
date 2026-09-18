@@ -2530,9 +2530,17 @@ function filedUnder (name) {
   return { known: known, submissions: seen.size, filed: filed, total: seen.size + filed };
 }
 
-/** is there a profile on the shared list under this exact spelling? */
+/**
+ * Is there a profile on the shared list for this spelling?
+ *
+ * Under its card name or its Full name, either. Asked by card name alone, a
+ * person whose card and form were spelled differently had "no profile" under
+ * the name their documents carry — and a near spelling of it anywhere else
+ * would have made their real documents look like the stray, with a button
+ * beside them to take them off.
+ */
 function profileUnder (name) {
-  try { return Object.prototype.hasOwnProperty.call(Store.profiles(), String(name || '').trim()); }
+  try { return !!profileKeyFor(name); }
   catch (err) { return false; }
 }
 
@@ -2614,8 +2622,10 @@ function duplicateProfileNote (name, after) {
                  `\u201c${found.other}\u201d stays as it is. This cannot be undone.`)) return;
     try {
       if (found.kind === 'profile') {
-        Store.deleteProfile(name);
-        await Sync.deleteProfile(name);
+        /* by the card it is kept under, which the row may not be named for */
+        const key = profileKeyFor(name) || name;
+        Store.deleteProfile(key);
+        await Sync.deleteProfile(key);
       } else {
         const gone = await Sync.removeStrayName(name);
         archiveLoaded = false;

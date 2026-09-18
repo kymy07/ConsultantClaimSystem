@@ -384,6 +384,21 @@ vm.runInContext(`
   }
 
   /* -----------------------------------------------------------------------
+     One person, one row. A profile is kept under the name on its card and
+     sends everything under the Full name on its form; a list that took the
+     card name for the person drew anybody whose two spellings differed
+     twice — once with nothing sent, once with everything.
+     ----------------------------------------------------------------------- */
+  console.log('\nWho a profile is');
+  const who = expr => vm.runInContext(expr, ctx);
+  check('a profile is the name its documents carry',
+    who(`profileFiledName('Anir Syazwan Sharbirin',
+                          { consultant: { name: 'Anir Syazwan bin Sharbirin' } })`),
+    'Anir Syazwan bin Sharbirin');
+  check('and its card name only when the form has none yet',
+    who(`profileFiledName('Someone New', { consultant: { name: '  ' } })`), 'Someone New');
+
+  /* -----------------------------------------------------------------------
      The payment advice. It is the office's own form and every box on it can
      be typed over, so what has to hold is that it opens as the invoice it
      pays, and that what somebody typed is what comes out the other end.

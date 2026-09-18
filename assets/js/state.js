@@ -782,6 +782,31 @@ const Store = {
   }
 };
 
+/**
+ * The name a saved profile's documents are filed under.
+ *
+ * A profile is kept under the name on its card, and everything it sends goes
+ * out under the Full name typed on the form. Usually they are one spelling.
+ * When they are not — a card saved as "Anir Syazwan Sharbirin" for a person
+ * whose form says "Anir Syazwan bin Sharbirin" — every list that took the
+ * card name for the person drew them twice: once under the card, with
+ * nothing sent, and once under the form's name, with everything they had.
+ * The person is the form's name; the card name is only where it is kept.
+ */
+function profileFiledName (key, profile) {
+  const full = String(((profile || {}).consultant || {}).name || '').trim();
+  return full || String(key || '').trim();
+}
+
+/** the card a person's profile is kept under, by either of its two names */
+function profileKeyFor (name) {
+  const who = String(name || '').trim();
+  if (!who) return '';
+  const all = Store.profiles();
+  if (Object.prototype.hasOwnProperty.call(all, who)) return who;
+  return Object.keys(all).filter(k => profileFiledName(k, all[k]) === who)[0] || '';
+}
+
 /** merge a stored object over the defaults so newly added fields are never lost */
 function mergeDefaults (saved) {
   const d = defaultState();

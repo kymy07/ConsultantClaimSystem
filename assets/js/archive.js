@@ -350,7 +350,7 @@ function filingNames () {
   try {
     const all = Store.profiles();
     Object.keys(all).forEach(n => {
-      const who = String(n).trim();
+      const who = profileFiledName(n, all[n]);
       if (who && Auth.owns(mergeDefaults(all[n]))) names.add(who);
     });
   } catch (err) {

@@ -278,7 +278,7 @@ function everybody () {
   const names = new Set();
   const all = Store.profiles();
   Object.keys(all).forEach(n => {
-    if (Auth.owns(mergeDefaults(all[n]))) names.add(n.trim());
+    if (Auth.owns(mergeDefaults(all[n]))) names.add(profileFiledName(n, all[n]));
   });
 
   /* A consultant sees their own rows. Their own means the profiles that are

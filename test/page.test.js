@@ -639,6 +639,21 @@ check('and nobody else’s is borrowed for that box',
    invoice's own figures, so the approved invoice stands in for it there
    exactly as it does on the PA's pages, and it opens in the same viewer —
    an approver checking what they approved does not download it first. */
+/* One person, one row. The status table, the PA's pages and History all
+   listed a profile under its card name, and its documents under the Full
+   name on its form — so anybody whose two spellings differed was two
+   people, one of them with nothing sent. They list the form's name now. */
+check('a person is listed under the name their documents carry',
+  /names\.add\(profileFiledName\(n, all\[n\]\)\)/.test(approvals) &&
+  /const who = profileFiledName\(n, all\[n\]\)/.test(archivejs) &&
+  /function profileFiledName/.test(statejs), true);
+/* And the slip detector knows them by both. Asked by card name alone, that
+   person had "no profile" under the name on their documents, and a near
+   spelling anywhere else would have offered to take their real documents
+   off the record. */
+check('and is known by either of their two names',
+  /function profileUnder[\s\S]{0,120}return !!profileKeyFor\(name\)/.test(signingjs) &&
+  /const key = profileKeyFor\(name\) \|\| name;\s*Store\.deleteProfile\(key\)/.test(signingjs), true);
 check('an approver can read an advice nobody has written',
   /const paid = kind === 'advice' && typeof previewAdviceFor === 'function'/.test(approvals) &&
   /button\('Preview', 'ghost small', \(\) => previewAdviceFor\(paid, null, look\)\)/
