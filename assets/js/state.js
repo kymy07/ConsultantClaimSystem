@@ -10,6 +10,10 @@ function defaultState () {
   const now = new Date();
   return {
     mode: '',                          // '' | 'invoice' | 'claim' | 'both'
+    /* Work on the claim form or the invoice that has not been saved to the
+       person's profile yet. It travels with the draft, so a reload does not
+       forget it; saving the profile is what clears it. */
+    unsaved: false,
     consultant: {
       name: '', ic: '', addr1: '', addr2: '',
       position: '', position2: '', workLoc: 'UZMA TOWER', empCode: '',

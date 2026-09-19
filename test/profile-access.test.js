@@ -13,7 +13,8 @@ const elements = Object.fromEntries(['profileMenu','profileCurrent','profileBox'
 const context = vm.createContext({
  Auth:{prepares:()=>prepares,owns:()=>false,isAdmin:()=>prepares},
  Store:{profiles:()=>{reads++;return {Other:{}};}},
- document:{getElementById:id=>elements[id]},mergeDefaults:p=>p
+ document:{getElementById:id=>elements[id]},mergeDefaults:p=>p,
+ activeProfile:'',leaveUnsaved:()=>true
 });
 ['openProfiles','refreshProfileList','editProfile','removeProfile','newProfile','startNewProfile','saveProfileNow'].forEach(name=>vm.runInContext(extract(name),context));
 context.refreshProfileList();

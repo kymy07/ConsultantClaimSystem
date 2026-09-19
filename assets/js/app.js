@@ -157,7 +157,16 @@ let stepIndex = 0;
 /* The last step of the form that was open, so a place you went to look
    knows where to send you back to. */
 let lastFormStep = 0;
-let activeProfile = '';          // the saved profile the form was opened from
+/* The saved profile the form was opened from. Remembered across a reload:
+   forgetting it meant Save filed the work under the name on the form, which
+   is not always the name on the card, and made a second profile of it. */
+const OPEN_PROFILE_KEY = 'ccs.openProfile';
+let activeProfile = (() => {
+  try { return localStorage.getItem(OPEN_PROFILE_KEY) || ''; } catch (e) { return ''; }
+})();
+function rememberOpenProfile () {
+  try { localStorage.setItem(OPEN_PROFILE_KEY, activeProfile || ''); } catch (e) { /* ignore */ }
+}
 
 function activeSteps () {
   /* An approver does not fill a claim in — they read one and sign it, so the
@@ -231,6 +240,8 @@ const INFO_STEPS = ['approvals', 'history', 'resubmit', 'todownload', 'toupload'
 function goToStep (i, skipGuard) {
   const list = activeSteps();
   const target = Math.max(0, Math.min(i, list.length - 1));
+  // the claim form and the invoice are left once they are saved, whichever way
+  if (target !== stepIndex && unsavedHere()) { holdUnsaved(); return; }
   const reporting = INFO_STEPS.indexOf(list[target].id) >= 0;
   if (!skipGuard && !reporting && target > stepIndex) {
     for (let k = stepIndex; k < target; k++) if (!canLeave(list[k].id)) return;
@@ -417,10 +428,72 @@ function renderNavRows () {
         : profileDirty ? 'Press Save Profile first' : '';
       if (next.disabled) next.setAttribute('aria-describedby', 'profileGate');
     }
+    if (WORK_STEPS.indexOf(step.id) >= 0 && S.unsaved) {
+      next.disabled = true;
+      next.title = 'Press Save first';
+    }
     next.addEventListener('click', () => goToStep(nextAt));
+    if (WORK_STEPS.indexOf(step.id) >= 0) row.appendChild(saveWorkButton());
     row.appendChild(next);
+  } else if (WORK_STEPS.indexOf(step.id) >= 0) {
+    row.appendChild(saveWorkButton());
   }
   panel.appendChild(row);
+}
+
+/* -----------------------------------------------------------------------
+   Saving the month's work
+
+   The draft autosaves, but there is one draft per browser and it is
+   whoever's form is open. Opening somebody else's profile replaced it, and
+   a time sheet worked on and never saved to its own person was gone. So the
+   claim form and the invoice are saved by hand, to the person, and are not
+   left - for another step, or another profile - until they are.
+   ----------------------------------------------------------------------- */
+const WORK_STEPS = ['claim', 'invoice'];
+
+function onWorkStep () {
+  const s = activeSteps()[stepIndex];
+  return !!s && WORK_STEPS.indexOf(s.id) >= 0;
+}
+
+/** somebody changed the claim form or the invoice */
+function markWorkDirty () {
+  if (!onWorkStep() || S.unsaved) return;
+  S.unsaved = true;
+  renderNavRows();
+}
+
+const unsavedHere = () => onWorkStep() && (S.unsaved || profileDirty);
+
+function holdUnsaved () {
+  toast('Press Save first \u2014 changes are only kept for this person once saved.', true);
+  const b = document.getElementById('btnSaveWork');
+  if (b) b.focus();
+}
+
+function saveWorkButton () {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'btnSaveWork';
+  const dirty = S.unsaved || profileDirty;
+  b.className = dirty ? 'btn primary' : 'btn ghost';
+  b.textContent = dirty ? 'Save' : 'Saved \u2713';
+  b.disabled = !dirty;
+  b.addEventListener('click', saveProfileNow);
+  return b;
+}
+
+/**
+ * Before the form is replaced by another profile: save what is unsaved, or
+ * stay. @returns {boolean} whether it is safe to go on
+ */
+function leaveUnsaved () {
+  if (!S.unsaved && !profileDirty) return true;
+  const who = activeProfile || String(S.consultant.name || '').trim() || 'this person';
+  if (!confirm(`Save the changes to "${who}" first?\n\nOK saves them and carries on. Cancel stays here.`)) return false;
+  saveProfileNow();
+  return !S.unsaved && !profileDirty;
 }
 
 /* ---------------- step 2: the choice cards ---------------- */
@@ -566,6 +639,7 @@ function bindInputs () {
       if (path.indexOf('consultant.') === 0 || path === 'invoice.monthlyRate') {
         markProfileDirty();
       }
+      markWorkDirty();
       syncAutoAmount();
       persist();
     });
@@ -573,7 +647,7 @@ function bindInputs () {
 }
 
 let lastName = '';
-const afterTimesheetChange = () => { persist(); syncAutoAmount(); };
+const afterTimesheetChange = () => { markWorkDirty(); persist(); syncAutoAmount(); };
 
 /* -----------------------------------------------------------------------
    Unsaved changes
@@ -822,11 +896,13 @@ function renderItems () {
         S.invoice.override = inp.value === '' ? null : Number(inp.value);
         paintOverride(computeAmount(S), S.invoice.override != null);
       }
+      markWorkDirty();
       refreshTotals();
       persist();
     }));
     tr.querySelector('.rowdel').addEventListener('click', () => {
       S.invoice.items.splice(i, 1);
+      markWorkDirty();
       renderItems(); refreshTotals(); persist();
       const remaining = tb.querySelectorAll('[data-f="desc"]');
       const focus = remaining[Math.min(i, remaining.length - 1)] || document.getElementById('btnAddItem');
@@ -1169,6 +1245,7 @@ let saveWarned = false;
 function persist () {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    rememberOpenProfile();
     Sync.pushDraft(S);                       // lazy, silent, never blocking
     if (Store.saveCurrent(S)) { saveWarned = false; return; }
     if (!saveWarned) {
@@ -1382,6 +1459,7 @@ function boot () {
   /* --- timesheet buttons --- */
   document.getElementById('btnAddActivity').addEventListener('click', () => {
     S.timesheet.activities.push(newActivity(''));
+    markWorkDirty();
     renderTimesheet(S, afterTimesheetChange);
     persist();
     const fields = document.querySelectorAll('#activities .c-act input');
@@ -1392,6 +1470,7 @@ function boot () {
     S.timesheet.activities.forEach(a => { a.days = {}; });
     // an empty sheet is an automatic one again: change the month and it fills
     S.timesheet.autoFilled = false;
+    markWorkDirty();
     renderTimesheet(S, afterTimesheetChange);
     syncAutoAmount(); persist();
     toast('All ticks cleared.');
@@ -1403,6 +1482,7 @@ function boot () {
       'Every working day is ticked and the Selangor public holidays are marked PH. ' +
       'Anything already on the grid is replaced.')) return;
     const done = autoFillMonth(S);
+    markWorkDirty();
     renderTimesheet(S, afterTimesheetChange);
     syncAutoAmount(); persist();
     const n = Object.keys(done.holidays).length;
@@ -1413,6 +1493,7 @@ function boot () {
 
   document.getElementById('btnAddItem').addEventListener('click', () => {
     S.invoice.items.push({ desc: '', position: S.consultant.position, period: '', amount: 0 });
+    markWorkDirty();
     renderItems(); refreshTotals(); persist();
     const fields = document.querySelectorAll('#itemTable [data-f="desc"]');
     if (fields.length) fields[fields.length - 1].focus();
@@ -1458,6 +1539,7 @@ function boot () {
     Sync.forget();
     S = defaultState();
     activeProfile = '';
+    rememberOpenProfile();
     fillDefaultsForMonth();
     stepIndex = 0;
     refreshProfileList();
@@ -1686,11 +1768,15 @@ function saveProfileNow () {
     S.consultant.email = Auth.email();
   }
 
+  const was = S.unsaved;
+  S.unsaved = false;                    // what is filed is saved, by definition
   if (!Store.saveProfile(name, S)) {
+    S.unsaved = was;
     toast('Could not save the profile (browser storage full?).', true);
     return;
   }
   activeProfile = name;
+  persist();
   clearProfileDirty();
   refreshProfileList();
   Sync.pushProfile(name, S);
@@ -1722,6 +1808,7 @@ function openProfiles (open) {
  */
 function editProfile (name) {
   if (!Auth.prepares()) return;
+  if (name !== activeProfile && !leaveUnsaved()) return;
   const p = Store.profiles()[name];
   if (p && !Auth.owns(mergeDefaults(p))) return;
   if (!p) { toast(`Profile "${name}" is no longer there.`, true); refreshProfileList(); return; }
@@ -1748,6 +1835,7 @@ function editProfile (name) {
  */
 function newProfile () {
   if (!Auth.prepares()) return;
+  if (!leaveUnsaved()) return;
   if (!confirm('Start a new profile?\n\nThe form open right now is cleared. Saved profiles are not touched.')) return;
   S = defaultState();
   fillDefaultsForMonth();
@@ -1769,7 +1857,7 @@ function removeProfile (name) {
 The form open right now is not touched.`)) return;
   Store.deleteProfile(name);
   Sync.deleteProfile(name);
-  if (activeProfile === name) activeProfile = '';
+  if (activeProfile === name) { activeProfile = ''; rememberOpenProfile(); }
   refreshProfileList();
   toast(`Profile "${name}" deleted.`);
 }
@@ -1888,6 +1976,7 @@ function renderProfileCards () {
 
 function startNewProfile () {
   if (!Auth.prepares()) return;
+  if (!leaveUnsaved()) return;
   if (String(S.consultant.name || '').trim() &&
       !confirm('Start a new profile? The details on screen stay saved under their own profile.')) return;
   S = defaultState();

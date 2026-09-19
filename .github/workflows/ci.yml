@@ -78,6 +78,9 @@ jobs:
       - name: Test the draft moving on to a new month
         run: node test/month-roll.test.js
 
+      - name: Test saving the claim form and invoice by hand
+        run: node test/save-work.test.js
+
       # Added with the screens they cover, but never run — a test nothing
       # runs is a comment that takes longer to write.
       - name: Test the archive Download all builds
