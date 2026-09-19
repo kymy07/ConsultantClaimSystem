@@ -81,7 +81,12 @@ function defaultState () {
          dated the 11th, because the 11th is when it was sent. Filling them
          in only when they were empty meant the first date a profile ever
          saw was the date it carried for ever. */
-      dateAuto: { prep: true, review: true, appr: true }
+      dateAuto: { prep: true, review: true, appr: true },
+      /* The calendar month in which somebody last picked this sheet's month
+         by hand: '2026-10'. A form still on a month that has ended is moved
+         on to the new one when it is opened — unless it was put there on
+         purpose this month, which is somebody finishing a late claim. */
+      chosenIn: ''
     },
     sig: { personnel: '', pm: '', hod: '', verified: '' },
     /* The office's own boxes on the payment advice: the department code, the

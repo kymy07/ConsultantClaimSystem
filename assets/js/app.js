@@ -659,6 +659,8 @@ function setTimesheetMonth (y, m, opts) {
 function onMonthChanged (opts) {
   const o = opts || {};
   const ts = S.timesheet;
+  const now = new Date();
+  ts.chosenIn = monthKey(now.getFullYear(), now.getMonth());
 
   // a month nobody has touched is filled in again for the new month; one
   // somebody has worked on is theirs, and is left exactly as it is
@@ -1176,6 +1178,69 @@ function persist () {
   }, 250);
 }
 
+/* ---------------- a new month ---------------- */
+
+/**
+ * Move a form left on a month that has ended onto this one.
+ *
+ * Everything typed is kept while the month runs: close the tab on the 20th
+ * and the 21st opens exactly where it was. Once the month is over the draft
+ * is next month's claim — the grid is filled again from the new month's
+ * calendar (its weekends, its public holidays), and the invoice follows it,
+ * because its period, its amount and its number all come from the sheet.
+ *
+ * What stays is the person: the details, the activity names, the rate, the
+ * leave already taken. What goes is what belonged to the month that ended.
+ *
+ * A sheet somebody worked on and never sent is not thrown away unasked:
+ * they may be finishing it late. Keeping it is remembered for the rest of
+ * this month, the same as picking the old month by hand.
+ *
+ * @returns {boolean} whether the form moved
+ */
+function rollToThisMonth () {
+  const ts = S.timesheet;
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const here = monthKey(y, m);
+  if (ts.year * 12 + ts.month >= y * 12 + m) return false;   // this month, or ahead
+  if (ts.chosenIn === here) return false;                      // put there on purpose
+
+  const was = `${MONTHS[ts.month]} ${ts.year}`;
+  const sent = Number((S.consultant.claimNos || {})[monthKey(ts.year, ts.month)]) >= 1;
+  if (!sent && !timesheetIsAuto(S) && confirm(
+    [ `Your ${was} time sheet has not been sent yet.`,
+      '',
+      `OK — keep working on ${was}.`,
+      `Cancel — start ${MONTHS[m]} ${y}. The ${was} days are cleared.` ].join('\n'))) {
+    ts.chosenIn = here;
+    return false;
+  }
+
+  const pad = n => String(n).padStart(2, '0');
+  ts.year = y;
+  ts.month = m;
+  ts.chosenIn = '';
+  ts.autoFilled = true;                 // refilled below from the new calendar
+  ts.dateAuto = { prep: true, review: true, appr: true };
+  ['reviewDate', 'apprDate', 'verifDate'].forEach(f => { ts[f] = ''; });
+
+  S.invoice.pStart = `${y}-${pad(m + 1)}-01`;
+  S.invoice.pEnd   = `${y}-${pad(m + 1)}-${pad(daysInMonth(y, m))}`;
+  S.invoice.due    = S.invoice.pEnd;
+  S.invoice.date   = `${y}-${pad(m + 1)}-${pad(now.getDate())}`;
+  S.invoice.override = null;            // a figure settled for one month only
+  S.invoice.autoNo = true;
+  S.invoice.items = S.invoice.items.slice(0, 1);   // line 1 follows the sheet
+  S.consultant.assignPeriod = monthLabel(ts);
+  S.advice = {};
+
+  autoFillMonth(S);
+  persist();
+  toast(`${MONTHS[m]} ${y} started — the time sheet is filled from this month's calendar.`);
+  return true;
+}
+
 /* ---------------- automatic defaults ---------------- */
 
 function fillDefaultsForMonth () {
@@ -1296,6 +1361,7 @@ function boot () {
     msel.appendChild(o);
   });
 
+  rollToThisMonth();
   fillDefaultsForMonth();
   writeBindings();
   bindInputs();
@@ -1500,6 +1566,7 @@ function boot () {
      ----------------------------------------------------------------------- */
   Sync.init(S, adopted => {
     S = adopted;
+    rollToThisMonth();
     stepIndex = 0;
     renderAll();
     Store.saveCurrent(S);
@@ -1664,6 +1731,7 @@ function editProfile (name) {
   /* A profile saved in August, opened in September, is a September claim.
      The month, the Assignment Period and an untouched grid all move with it —
      the same thing that happens when the app is opened cold. */
+  rollToThisMonth();
   fillDefaultsForMonth();
   clearProfileDirty();
   renderAll();

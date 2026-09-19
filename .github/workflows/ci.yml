@@ -75,6 +75,9 @@ jobs:
       - name: Test document generation (PDF / Excel / Word)
         run: node test/generate.test.js
 
+      - name: Test the draft moving on to a new month
+        run: node test/month-roll.test.js
+
       # Added with the screens they cover, but never run — a test nothing
       # runs is a comment that takes longer to write.
       - name: Test the archive Download all builds
