@@ -81,6 +81,9 @@ jobs:
       - name: Test saving the claim form and invoice by hand
         run: node test/save-work.test.js
 
+      - name: Test which days of a month are paid
+        run: node test/paid-days.test.js
+
       # Added with the screens they cover, but never run — a test nothing
       # runs is a comment that takes longer to write.
       - name: Test the archive Download all builds

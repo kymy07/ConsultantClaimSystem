@@ -535,6 +535,12 @@ function dayMarkOf (ts, d) {
   for (const act of ts.activities || []) {
     if (act.days && act.days[d] && act.days[d] !== DASH) return act.days[d];
   }
+  /* A dash is a day the person was not on this claim at all — somebody who
+     started on the 14th, or left mid-month. It is not paid, and that holds
+     for a Saturday as much as for a Tuesday: the weekends before a start
+     date were being paid because the calendar was asked instead of the
+     sheet, and a mid-month starter was paid four days he had not begun. */
+  if (dashedDay(ts, d)) return DASH;
   const w = dowOf(ts.year, ts.month, d);
   return w === 6 ? 'SAT' : w === 0 ? 'SUN' : '';
 }
