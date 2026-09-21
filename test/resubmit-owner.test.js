@@ -24,7 +24,7 @@ const ctx = vm.createContext({
   Auth: { isAdmin: () => admin },
   myEmail: () => 'tajul@uzmagroup.com'
 });
-['ownedByMe', 'whoseToFix', 'mineToFix'].forEach(n => vm.runInContext(extract(n), ctx));
+['ownedByMe', 'canFix', 'whoseToFix', 'mineToFix'].forEach(n => vm.runInContext(extract(n), ctx));
 const mine = { created_by: 'Tajul@uzmagroup.com', consultant: 'Mohd Tajul Azuar bin Ahmad Sharby' };
 const theirs = { created_by: 'nizar@uzmagroup.com', consultant: 'Syed Nizar bin Syed Tarmizi' };
 
@@ -32,24 +32,36 @@ assert.equal(ctx.ownedByMe(mine), true, 'the address is the same whatever its ca
 assert.equal(ctx.ownedByMe(theirs), false);
 console.log('  ok    a returned document belongs to the account that sent it');
 
-// The administrator sees everything that came back, and owns only their own.
-admin = true;
-assert.equal(ctx.mineToFix(theirs), true, 'still listed for the administrator');
-assert.equal(ctx.ownedByMe(theirs), false, 'but not theirs to send again');
-assert.equal(ctx.whoseToFix(theirs), 'Syed Nizar bin Syed Tarmizi');
-console.log('  ok    the administrator reads somebody else\'s, and is told whose it is');
+// A consultant fixes their own, and nobody else's.
+assert.equal(ctx.canFix(mine), true);
+assert.equal(ctx.canFix(theirs), false);
 
-// The card offers Resubmit only to the owner, and says who it waits on.
-assert.match(src, /const mine = ownedByMe\(sub\);/);
+// The administrator stands in at any stage, and is told whose it is.
+admin = true;
+assert.equal(ctx.mineToFix(theirs), true, 'listed for the administrator');
+assert.equal(ctx.canFix(theirs), true, 'and theirs to fix and send again');
+assert.equal(ctx.ownedByMe(theirs), false, 'while still not their own document');
+assert.equal(ctx.whoseToFix(theirs), 'Syed Nizar bin Syed Tarmizi');
+console.log('  ok    a consultant fixes only their own; the administrator stands in');
+
+// The card offers Resubmit to those two, and says who it waits on otherwise.
+assert.match(src, /const mine = canFix\(sub\);/);
 assert.match(src, /if \(!open && mine\) bar\.appendChild\(button\('Open and fix'/);
-assert.match(src, /if \(mine\) \{\s*const send = button\('Resubmit for approval'/);
+assert.match(src, /if \(mine\) \{[\s\S]{0,400}const send = button\(behalf/);
 assert.match(src, /Waiting on \$\{whoseToFix\(sub\)\} to fix and send it again/);
-// ...and the status table's own Resubmit button follows the same rule
-assert.match(approvals, /if \(String\(sub\.created_by \|\| ''\)\.toLowerCase\(\) === myEmail\(\)\) \{\s*acts\.appendChild\(button\('Resubmit'/);
-console.log('  ok    and neither screen offers a button BDOS would refuse');
+// standing in says so on the button, so nobody sends one by accident
+assert.match(src, /const behalf = !ownedByMe\(sub\);/);
+assert.match(src, /Resubmit for \$\{whoseToFix\(sub\)\}/);
+assert.match(src, /Sent again on behalf of \$\{whoseToFix\(sub\)\}/);
+// ...and the status table offers it to the same two accounts
+assert.match(approvals, /=== myEmail\(\) \|\| Auth\.isAdmin\(\)\)\) \{[\s\S]{0,200}button\('Resubmit'/);
+console.log('  ok    the button names whose document it sends, and only where it can work');
 
 // A refusal is said in words, not as a status code.
-assert.match(src, /err\.status === 403[\s\S]{0,200}can send this one again/);
+assert.match(src, /err\.status === 403[\s\S]{0,400}can send this one again/);
+assert.match(src, /acts_on|act at any stage there/, 'and tells the admin where the rule lives');
+// opening a returned document never lands on top of an unsaved month
+assert.match(src, /if \(S && S\.unsaved\) return false;/);
 assert.match(src, /err\.status === 409[\s\S]{0,160}already moved on/);
 console.log('  ok    a refusal says what happened and reloads the list');
 

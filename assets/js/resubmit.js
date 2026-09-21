@@ -89,16 +89,22 @@ function mineToFix (sub) {
   return ownedByMe(sub) || Auth.isAdmin();
 }
 
-/**
- * Is this one ours to send again?
- *
- * A returned claim is waiting on the person who sent it, and BDOS enforces
- * that: anybody else pressing Resubmit was answered 403 and shown the raw
- * code. The administrator still sees what has come back -- somebody has to
- * know why a month is stuck -- but the document is that person's to fix.
- */
+/** the account that sent it, which is who a returned document waits on */
 function ownedByMe (sub) {
   return String(sub.created_by || '').toLowerCase() === myEmail();
+}
+
+/**
+ * Is this one ours to fix and send again?
+ *
+ * Whoever sent it, and the administrator, who stands in at any stage: a
+ * consultant on leave whose invoice came back should not hold up a month,
+ * and the office is the one chasing it. Anybody else reads it and is told
+ * whose it is -- pressing a button BDOS would refuse is not an option
+ * anybody wanted.
+ */
+function canFix (sub) {
+  return ownedByMe(sub) || Auth.isAdmin();
 }
 
 /** who is being waited on, as a name rather than an address */
@@ -144,6 +150,7 @@ const returnedCount = () => returned.length;
 function safeToOpen (sub) {
   if (fixingId()) return false;                       // already fixing one
   if (typeof profileDirty !== 'undefined' && profileDirty) return false;
+  if (S && S.unsaved) return false;                   // a month not saved to its person
 
   const here = String(S.consultant.name || '').trim();
   if (!here) return true;                             // nothing on screen to lose
@@ -291,12 +298,17 @@ function returnedCard (sub) {
   /* Only a document that is not the one open in the form needs asking for:
      more than one came back, or opening this one would replace work that is
      not about it. Once it is open there is nothing to press — it is there. */
-  const mine = ownedByMe(sub);
+  const mine = canFix(sub);
   if (!open && mine) bar.appendChild(button('Open and fix', 'ghost small', () => openToFix(sub)));
 
   if (mine) {
-    const send = button('Resubmit for approval', 'primary',
-                        () => resubmitOne(sub, note.value.trim(), send));
+    /* Said on the button when it is somebody else's: the administrator is
+       standing in, and the claim goes back round under that person's name,
+       not theirs. */
+    const behalf = !ownedByMe(sub);
+    const send = button(behalf ? `Resubmit for ${whoseToFix(sub)}` : 'Resubmit for approval',
+                        'primary', () => resubmitOne(sub, note.value.trim(), send));
+    if (behalf) send.title = `Sent again on behalf of ${whoseToFix(sub)}`;
     bar.appendChild(send);
   } else {
     const waiting = document.createElement('span');
@@ -398,7 +410,9 @@ async function resubmitOne (sub, note, btn) {
        one that has already moved on. Both read as a bare status code, and
        neither says what to do about it. */
     if (err.status === 403) {
-      toast(`Only ${whoseToFix(sub)} can send this one again — it is waiting on them, not on this account.`, true);
+      toast(Auth.isAdmin()
+        ? `BDOS would not let this account send ${whoseToFix(sub)}'s document again. The admin has to be allowed to act at any stage there — see docs/BDOS-CCS-Endpoints.md.`
+        : `Only ${whoseToFix(sub)} can send this one again — it is waiting on them, not on this account.`, true);
       await loadReturned();
       renderResubmit();
       renderStepper();

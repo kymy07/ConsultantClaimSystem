@@ -585,14 +585,13 @@ function statusRow (name, kind, sub, first) {
       put.title = 'File the approved invoice for this month';
       acts.appendChild(put);
     }
-    /* Sending it again is the sender's, because that is who it is waiting
-       on and BDOS refuses anybody else. The administrator still opens it --
-       reading a returned claim is how they answer "why is this stuck?" */
-    if (sub.status === 'returned' && (String(sub.created_by || '').toLowerCase() === myEmail() || Auth.isAdmin())) {
+    /* Whoever sent it, and the administrator, who stands in at any stage.
+       Anybody else reads it: pressing this would be refused by BDOS, and a
+       button that cannot work is worse than no button. */
+    if (sub.status === 'returned' &&
+        (String(sub.created_by || '').toLowerCase() === myEmail() || Auth.isAdmin())) {
       acts.appendChild(button('Open', 'ghost small', () => loadIntoForm(sub.id)));
-      if (String(sub.created_by || '').toLowerCase() === myEmail()) {
-        acts.appendChild(button('Resubmit', 'small', () => toggleDecide(sub.id, 'resubmit')));
-      }
+      acts.appendChild(button('Resubmit', 'small', () => toggleDecide(sub.id, 'resubmit')));
     }
     // the account that set the thing up is the one that clears up after it
     if (Auth.isAdmin()) {

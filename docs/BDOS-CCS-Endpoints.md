@@ -282,9 +282,16 @@ signature in it, so BDOS never has to know where inside that object a signature 
 carry the fix, or the approver is handed the very document they rejected. `note` is
 required by CCS on a `return`, since it is the only thing the consultant is told.
 
+**The `admin` acts at any stage**, including `resubmit` on a row it did not create. This is the
+row in the table above spelled out for this endpoint: the office prepares claims for people, and a
+consultant who is on leave, has left, or simply cannot be reached should not hold a month up.
+Refusing it means a returned claim sits there until that one person comes back. `history` records
+who actually pressed it, so standing in is visible rather than silent, and CCS says on the button
+whose document is being sent.
+
 Refusals are the point of this endpoint, so they are specific: `403` when the claim is waiting on
-somebody else, `409` when it is not waiting on anybody (already finished, or already moved on by
-whoever got there first), `404` when there is no such claim. The row is locked `FOR UPDATE` for
+somebody else and the account is not the `admin`, `409` when it is not waiting on anybody (already
+finished, or already moved on by whoever got there first), `404` when there is no such claim. The row is locked `FOR UPDATE` for
 the length of a decision, so two approvers pressing at the same moment cannot both move it.
 
 `history` is every move anybody made — `{ at, by, role, action, note, from, to }` — appended and
