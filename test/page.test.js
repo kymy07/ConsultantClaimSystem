@@ -389,7 +389,7 @@ check('before the card holding it is rebuilt',
    the reason above it and the way to send it again below it. A button that
    opens what is already open is a button for its own sake. */
 check('and once open it is there, not behind a button',
-  /if \(!open\) bar\.appendChild\(button\('Open and fix'/.test(resubjs) &&
+  /if \(!open && mine\) bar\.appendChild\(button\('Open and fix'/.test(resubjs) &&
   !/Close the editor|Edit the \$\{/.test(resubjs), true);
 
 check('but never over somebody else’s unsaved work',

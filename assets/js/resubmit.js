@@ -86,7 +86,24 @@ function setFixing (id) {
 
 /** is this account the one who has to fix it? */
 function mineToFix (sub) {
-  return String(sub.created_by || '').toLowerCase() === myEmail() || Auth.isAdmin();
+  return ownedByMe(sub) || Auth.isAdmin();
+}
+
+/**
+ * Is this one ours to send again?
+ *
+ * A returned claim is waiting on the person who sent it, and BDOS enforces
+ * that: anybody else pressing Resubmit was answered 403 and shown the raw
+ * code. The administrator still sees what has come back -- somebody has to
+ * know why a month is stuck -- but the document is that person's to fix.
+ */
+function ownedByMe (sub) {
+  return String(sub.created_by || '').toLowerCase() === myEmail();
+}
+
+/** who is being waited on, as a name rather than an address */
+function whoseToFix (sub) {
+  return String(sub.consultant || '').trim() || sub.created_by || 'the person who sent it';
 }
 
 /**
@@ -274,11 +291,19 @@ function returnedCard (sub) {
   /* Only a document that is not the one open in the form needs asking for:
      more than one came back, or opening this one would replace work that is
      not about it. Once it is open there is nothing to press — it is there. */
-  if (!open) bar.appendChild(button('Open and fix', 'ghost small', () => openToFix(sub)));
+  const mine = ownedByMe(sub);
+  if (!open && mine) bar.appendChild(button('Open and fix', 'ghost small', () => openToFix(sub)));
 
-  const send = button('Resubmit for approval', 'primary',
-                      () => resubmitOne(sub, note.value.trim(), send));
-  bar.appendChild(send);
+  if (mine) {
+    const send = button('Resubmit for approval', 'primary',
+                        () => resubmitOne(sub, note.value.trim(), send));
+    bar.appendChild(send);
+  } else {
+    const waiting = document.createElement('span');
+    waiting.className = 'statusnone';
+    waiting.textContent = `Waiting on ${whoseToFix(sub)} to fix and send it again`;
+    bar.appendChild(waiting);
+  }
   /* Rows left behind by setting the thing up look exactly like real ones.
      The administrator can take them off the record; nobody else can, and
      nothing about the process does it — a claim that was wrong is sent back,
@@ -369,7 +394,22 @@ async function resubmitOne (sub, note, btn) {
     renderStepper();
     if (typeof renderApprovals === 'function') await renderApprovals();
   } catch (err) {
-    toast(err.message || 'Could not send it.', true);
+    /* The two refusals that are not faults: somebody else's document, and
+       one that has already moved on. Both read as a bare status code, and
+       neither says what to do about it. */
+    if (err.status === 403) {
+      toast(`Only ${whoseToFix(sub)} can send this one again — it is waiting on them, not on this account.`, true);
+      await loadReturned();
+      renderResubmit();
+      renderStepper();
+    } else if (err.status === 409) {
+      toast('That document is not waiting on anybody — it has already moved on.', true);
+      await loadReturned();
+      renderResubmit();
+      renderStepper();
+    } else {
+      toast(err.message || 'Could not send it.', true);
+    }
   } finally {
     resubmitBusy = false;
     btn.disabled = false;
