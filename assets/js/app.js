@@ -136,6 +136,11 @@ const STEPS = [
      it was downloaded, signed on paper or in another program, and is coming
      back. Plain "Upload" read as a place to put something new. */
   { id: 'toupload',   label: 'Re-Upload', signs: true },
+  /* The last thing that happens to a month. It was two buttons on the
+     heading of a table further down the record, which is a fine place for
+     somebody who already knows they are there and no place at all for
+     somebody looking for what to do next. It is a step, so it is a step. */
+  { id: 'tofinance',  label: 'Send to Finance', signs: true },
   /* Not a step either: the job behind, rather than the job in front. */
   /* Called History for the PA, who has no other: it is where a confirmed
      month lives, under the person's name. The administrator already has a
@@ -283,6 +288,7 @@ function showStep () {
   if (step.id === 'mysign') renderMySignature();
   if (step.id === 'todownload') renderSignDownload();
   if (step.id === 'toupload') renderSignUpload();
+  if (step.id === 'tofinance') renderToFinance();
   if (step.id === 'advice') renderAdvice();
   if (step.id === 'filed') renderFiled();
   window.scrollTo({ top: 0, behavior: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -1573,6 +1579,9 @@ function boot () {
   if (btnDl) btnDl.addEventListener('click', () => renderSignDownload());
   const btnUp = document.getElementById('btnRefreshSignUpload');
   if (btnUp) btnUp.addEventListener('click', () => renderSignUpload());
+  const btnFin = document.getElementById('btnRefreshFinance');
+  // the zip is built from the filed copies, so ask for those again too
+  if (btnFin) btnFin.addEventListener('click', () => { archiveLoaded = false; renderToFinance(); });
   const advSend = document.getElementById('adviceEditorSend');
   if (advSend) advSend.addEventListener('click', () => prepareAdvice(advSend));
   const advClose = document.getElementById('adviceEditorClose');

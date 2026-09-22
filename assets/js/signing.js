@@ -2336,6 +2336,195 @@ function downloadEveryoneZip (month, names, control) {
 }
 
 /* -------------------------------------------------------------------
+   The step that sends it
+
+   Everything below was reachable only from the record, as two buttons on
+   the heading of a month's table. Whoever files the signed copies then had
+   to know that the last part of their job lived on a page about the past.
+   So the same two buttons are a step of their own, at the end of the run
+   they belong to, with the month in front of them and what the zip will
+   hold written out before it is built.
+   ------------------------------------------------------------------- */
+
+let financePick = '';            // 'YYYY-MM' the step is showing
+
+/** every month anybody has a document for, newest first */
+function financeMonths () {
+  const seen = new Map();
+  const add = (y, m) => {
+    if (!y || !m) return;
+    seen.set(`${y}-${String(m).padStart(2, '0')}`, { y: Number(y), m: Number(m) });
+  };
+  signingSubs.forEach(s => add(Number(s.period_year), Number(s.period_month)));
+  (typeof archive !== 'undefined' ? archive : []).forEach(r =>
+    add(Number(r.period_year), Number(r.period_month)));
+  const now = currentSigningMonth();
+  add(now.y, now.m);
+  return [...seen.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(e => e[1]);
+}
+
+/**
+ * What the zip will hold for one person and document, without building it.
+ *
+ * The same three answers gatherMonth() arrives at, read off the lists this
+ * page already has: the signed copy if one was filed, the document drawn
+ * from the app if not, and nothing at all when there is nothing to draw.
+ */
+function financeState (name, month, kind) {
+  const rec = { consultant: name, period_year: month.y, period_month: month.m };
+  if (typeof archiveFor === 'function' &&
+      archiveFor(name, month.y, month.m - 1, kind)) {
+    return { word: 'Signed copy', how: 'filed' };
+  }
+  if (monthSubmission(rec, kind)) return { word: 'From the app', how: 'drawn' };
+  if (kind === 'advice' && adviceUnlocked(monthSubmission(rec, 'invoice'))) {
+    return { word: 'From the invoice', how: 'drawn' };
+  }
+  return { word: 'Missing', how: 'none' };
+}
+
+const FINANCE_DOCS = [['claim', 'Time sheet'], ['invoice', 'Invoice'], ['advice', 'Payment Advice']];
+
+async function renderToFinance () {
+  const host = document.getElementById('financeList');
+  if (!host) return;
+  if (!(await loadSigning(host, renderToFinance))) return;
+  await learnSigningKinds();
+
+  host.innerHTML = '';
+
+  const months = financeMonths();
+  if (!months.some(m => `${m.y}-${String(m.m).padStart(2, '0')}` === financePick)) {
+    financePick = `${months[0].y}-${String(months[0].m).padStart(2, '0')}`;
+  }
+  const month = months.find(m => `${m.y}-${String(m.m).padStart(2, '0')}` === financePick);
+  const label = `${MONTHS[Math.max(0, month.m - 1)]} ${month.y}`;
+
+  /* The month is chosen here rather than taken from the calendar: a month
+     is sent once everything is in, and that is usually the month before. */
+  const chooser = document.createElement('div');
+  chooser.className = 'monthpick';
+  const pickLabel = document.createElement('label');
+  pickLabel.className = 'fieldlabel';
+  pickLabel.appendChild(document.createTextNode('Month'));
+  const select = document.createElement('select');
+  select.id = 'financeMonthPick';
+  months.forEach(m => {
+    const o = document.createElement('option');
+    o.value = `${m.y}-${String(m.m).padStart(2, '0')}`;
+    o.textContent = `${MONTHS[Math.max(0, m.m - 1)]} ${m.y}`;
+    select.appendChild(o);
+  });
+  select.value = financePick;
+  select.addEventListener('change', () => { financePick = select.value; renderToFinance(); });
+  pickLabel.appendChild(select);
+  chooser.appendChild(pickLabel);
+  host.appendChild(chooser);
+
+  /* Everybody with anything that month. Somebody with nothing at all is not
+     in the zip and is not a row here either — they are not part of this
+     month, and a table of empty rows says nothing. */
+  const roster = signingRoster();
+  const rows = roster.map(name => ({
+    name: name,
+    docs: FINANCE_DOCS.map(d => ({ kind: d[0], label: d[1], state: financeState(name, month, d[0]) }))
+  })).filter(r => r.docs.some(d => d.state.how !== 'none'));
+
+  if (!rows.length) {
+    const none = document.createElement('p');
+    none.className = 'emptynote';
+    none.setAttribute('role', 'status');
+    none.textContent = `Nothing has been filed or submitted for ${label} yet.`;
+    host.appendChild(none);
+    return;
+  }
+
+  const short = rows.filter(r => r.docs.some(d => d.state.how === 'none'));
+  const count = document.createElement('p');
+  count.className = 'historycount';
+  count.setAttribute('role', 'status');
+  count.textContent = `${rows.length} ${rows.length === 1 ? 'person' : 'people'} in ${label}` +
+    (short.length ? ` — ${short.length} still short a document.` : ', nothing missing.');
+  host.appendChild(count);
+
+  host.appendChild(financeTable(rows, label));
+
+  /* Who the message goes to, on the page rather than inside the file: the
+     addresses are the office's and somebody should be able to read them
+     before pressing the button, not after opening the draft. */
+  const who = document.createElement('p');
+  who.className = 'backwho';
+  who.textContent = 'To ' + FINANCE_MAIL.to.join(', ') + ' · Cc ' + FINANCE_MAIL.cc.join(', ');
+  host.appendChild(who);
+
+  const bar = document.createElement('div');
+  bar.className = 'btnrow';
+  const when = { period_year: month.y, period_month: month.m };
+  const names = rows.map(r => r.name);
+  // each button hands itself to the work, so it can be held while it runs
+  const zip = button('Download zip', 'ghost', () => downloadEveryoneZip(when, names, zip));
+  zip.title = `Every document for ${label}, one folder per person`;
+  bar.appendChild(zip);
+  const mail = button('Email Finance', 'primary', () => sendMonthToFinance(when, names, mail));
+  mail.title = `Compile ${label} and open the e-mail to Finance`;
+  bar.appendChild(mail);
+  host.appendChild(bar);
+
+  const note = document.createElement('p');
+  note.className = 'emptynote';
+  note.textContent = 'The e-mail downloads as a file. Open it and it becomes a draft in Outlook, ' +
+    'with the zip already attached — nothing is sent until you press Send there.';
+  host.appendChild(note);
+}
+
+/** what the zip will hold, one row per person */
+function financeTable (rows, label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'history-table-wrap';
+  wrap.tabIndex = 0;
+  wrap.setAttribute('role', 'region');
+  wrap.setAttribute('aria-label', label + ' documents for Finance');
+
+  const table = document.createElement('table');
+  table.className = 'history-table signingtable';
+  const caption = document.createElement('caption');
+  caption.textContent = label;
+  table.appendChild(caption);
+
+  const head = document.createElement('thead');
+  const titles = document.createElement('tr');
+  ['Consultant'].concat(FINANCE_DOCS.map(d => d[1])).forEach(text => {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = text;
+    titles.appendChild(th);
+  });
+  head.appendChild(titles);
+  table.appendChild(head);
+
+  const body = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    const who = document.createElement('td');
+    who.className = 'c-name';
+    who.textContent = row.name;
+    tr.appendChild(who);
+    row.docs.forEach(doc => {
+      const td = document.createElement('td');
+      const tag = document.createElement('span');
+      tag.className = 'statusbadge' + (doc.state.how === 'none' ? ' warn' : '');
+      tag.textContent = doc.state.word;
+      td.appendChild(tag);
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+/* -------------------------------------------------------------------
    To Finance
 
    A finished month goes to Accounts Payable by e-mail, with the zip

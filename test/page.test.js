@@ -1010,6 +1010,34 @@ check('and never on the strength of an empty cache',
 check('the note is on the PA’s tables and the Status table alike',
   /const dup = duplicateProfileNote\(name, \(\) => \{/.test(signingjs) &&
   /duplicateProfileNote\(name, \(\) => renderApprovals\(\)\)/.test(approvals), true);
+/* Sending the month was two buttons on the heading of a table in the
+   record. Whoever files the signed copies had to know the last part of
+   their job lived on a page about the past, so it is a step of its own at
+   the end of the run it belongs to — the PA's, and the admin's after it. */
+check('sending the month to Finance is a step of its own',
+  /\{ id: 'tofinance',  label: 'Send to Finance', signs: true \}/.test(appjs) &&
+  /id="p-tofinance"/.test(html) && /id="financeList"/.test(html) &&
+  /if \(step\.id === 'tofinance'\) renderToFinance\(\)/.test(appjs) &&
+  /\{ id: 'toupload',   label: 'Re-Upload', signs: true \},\s*\/\*[\s\S]{0,400}\{ id: 'tofinance'/.test(appjs),
+  true);
+/* It says what the zip will hold before it is built: the signed copy where
+   one was filed, the drawn document where one was not, and by name what is
+   missing — a month is never sent short without it being said. */
+check('and says what the zip will hold before building it',
+  /function financeState \(name, month, kind\)/.test(signingjs) &&
+  /return \{ word: 'Signed copy', how: 'filed' \}/.test(signingjs) &&
+  /return \{ word: 'From the app', how: 'drawn' \}/.test(signingjs) &&
+  /return \{ word: 'Missing', how: 'none' \}/.test(signingjs) &&
+  /still short a document/.test(signingjs), true);
+check('the same two buttons do the work, and hold themselves while they run',
+  /const zip = button\('Download zip', 'ghost', \(\) => downloadEveryoneZip\(when, names, zip\)\)/
+    .test(signingjs) &&
+  /const mail = button\('Email Finance', 'primary', \(\) => sendMonthToFinance\(when, names, mail\)\)/
+    .test(signingjs), true);
+check('and the addresses are on the page, not only inside the file',
+  /'To ' \+ FINANCE_MAIL\.to\.join\(', '\) \+ ' · Cc ' \+ FINANCE_MAIL\.cc\.join\(', '\)/
+    .test(signingjs) &&
+  /adlishah\.sharilfudin@uzmagroup\.com/.test(signingjs), true);
 check('the administrator sends a month to Finance',
   /Email Finance/.test(archivejs) && /sendMonthToFinance\(when, everyone\(\), control\)/.test(archivejs) &&
   /const FINANCE_MAIL = /.test(signingjs) && /adib\.azman@uzmagroup\.com/.test(signingjs) &&

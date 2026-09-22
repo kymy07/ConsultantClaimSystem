@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#223140">
 <meta name="description" content="Prepare your monthly claim and invoice, follow approvals, and collect signed documents with Geospatial AI.">
 <title>Consultant Claim System</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20260922a">
+<link rel="stylesheet" href="assets/css/style.css?v=20260922b">
 </head>
 <body class="locked">
 <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -567,6 +567,20 @@
   <div id="adviceList" class="archive"></div>
 </section>
 
+<section class="panel" id="p-tofinance" data-step="tofinance">
+  <div class="panel-heading">
+    <div><h2>Send the month to Finance</h2><p class="lead">One zip of everything signed for the month, and the e-mail that carries it. <b>Download zip</b> keeps a copy; <b>Email Finance</b> opens the message already written, with the zip attached.</p></div>
+    <details class="help-disclosure">
+      <summary><span class="help-symbol" aria-hidden="true">?</span><span>Sending guide</span></summary>
+      <div class="help-content"><p>The table says what the zip will hold: a signed copy where one was filed on the Re-Upload step, and the document drawn from the app where one was not. Anything missing is named, so a month is never sent short without it being said. <b>Email Finance</b> downloads an <code>.eml</code> file — open it and it becomes a draft in Outlook, addressed and written, with the zip attached. Nothing is sent until you press Send there.</p></div>
+    </details>
+  </div>
+  <div class="btnrow">
+    <button class="btn ghost small" id="btnRefreshFinance">Refresh</button>
+  </div>
+  <div id="financeList" class="archive"></div>
+</section>
+
 <section class="panel" id="p-filed" data-step="filed">
   <h2>Filed claim forms</h2>
   <p class="lead">Signed claims sent to Group People &amp; Finance, with monthly leave records.</p>
@@ -643,29 +657,29 @@
      page again but keeps the old JavaScript for up to four hours
      — which reads as "the fix did not work". Bump this stamp whenever
      anything under assets/ changes and a reload picks it all up at once. -->
-<script src="vendor/jspdf.umd.min.js?v=20260922a"></script>
-<script src="vendor/jspdf.plugin.autotable.min.js?v=20260922a"></script>
-<script src="vendor/carlito.js?v=20260922a"></script>
-<script src="vendor/exceljs.min.js?v=20260922a"></script>
-<script src="vendor/FileSaver.min.js?v=20260922a"></script>
-<script src="vendor/signature_pad.umd.min.js?v=20260922a"></script>
-<script src="vendor/docx.umd.js?v=20260922a"></script>
-<script src="assets/js/state.js?v=20260922a"></script>
-<script src="assets/js/holidays.js?v=20260922a"></script>
-<script src="assets/js/logo.js?v=20260922a"></script>
-<script src="assets/js/timesheet.js?v=20260922a"></script>
-<script src="assets/js/signature.js?v=20260922a"></script>
-<script src="assets/js/gen-invoice.js?v=20260922a"></script>
-<script src="assets/js/gen-claim.js?v=20260922a"></script>
-<script src="assets/js/gen-advice.js?v=20260922a"></script>
-<script src="assets/js/preview.js?v=20260922a"></script>
-<script src="assets/js/auth.js?v=20260922a"></script>
-<script src="assets/js/sync.js?v=20260922a"></script>
-<script src="assets/js/zip.js?v=20260922a"></script>
-<script src="assets/js/approvals.js?v=20260922a"></script>
-<script src="assets/js/archive.js?v=20260922a"></script>
-<script src="assets/js/resubmit.js?v=20260922a"></script>
-<script src="assets/js/signing.js?v=20260922a"></script>
-<script src="assets/js/app.js?v=20260922a"></script>
+<script src="vendor/jspdf.umd.min.js?v=20260922b"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js?v=20260922b"></script>
+<script src="vendor/carlito.js?v=20260922b"></script>
+<script src="vendor/exceljs.min.js?v=20260922b"></script>
+<script src="vendor/FileSaver.min.js?v=20260922b"></script>
+<script src="vendor/signature_pad.umd.min.js?v=20260922b"></script>
+<script src="vendor/docx.umd.js?v=20260922b"></script>
+<script src="assets/js/state.js?v=20260922b"></script>
+<script src="assets/js/holidays.js?v=20260922b"></script>
+<script src="assets/js/logo.js?v=20260922b"></script>
+<script src="assets/js/timesheet.js?v=20260922b"></script>
+<script src="assets/js/signature.js?v=20260922b"></script>
+<script src="assets/js/gen-invoice.js?v=20260922b"></script>
+<script src="assets/js/gen-claim.js?v=20260922b"></script>
+<script src="assets/js/gen-advice.js?v=20260922b"></script>
+<script src="assets/js/preview.js?v=20260922b"></script>
+<script src="assets/js/auth.js?v=20260922b"></script>
+<script src="assets/js/sync.js?v=20260922b"></script>
+<script src="assets/js/zip.js?v=20260922b"></script>
+<script src="assets/js/approvals.js?v=20260922b"></script>
+<script src="assets/js/archive.js?v=20260922b"></script>
+<script src="assets/js/resubmit.js?v=20260922b"></script>
+<script src="assets/js/signing.js?v=20260922b"></script>
+<script src="assets/js/app.js?v=20260922b"></script>
 </body>
 </html>
