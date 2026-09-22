@@ -2354,7 +2354,8 @@ const FINANCE_MAIL = {
   to: ['adib.azman@uzmagroup.com'],                         // Muhammad Adib Zharif Mohd Azman
   cc: ['afizah.ariffin@uzmagroup.com',                      // Afizah Ariffin
        'fadhli.jamaluddin@uzmagroup.com',                   // Mohammad Fadhli Jamaluddin
-       'aisya.abas@uzmagroup.com'],                         // Aisya Azizah Abas
+       'aisya.abas@uzmagroup.com',                          // Aisya Azizah Abas
+       'adlishah.sharilfudin@uzmagroup.com'],               // Adlishah Hakimi bin Sharilfuddin
   dear: 'Adib',
   project: 'PSPJN'
 };
