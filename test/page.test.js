@@ -411,8 +411,8 @@ const signingjs = fs.readFileSync(path.join(ROOT, 'assets/js/signing.js'), 'utf8
 const previewjs = fs.readFileSync(path.join(ROOT, 'assets/js/preview.js'), 'utf8');
 check('both pages are in the page',
   /id="p-todownload"/.test(html) && /id="p-toupload"/.test(html), true);
-check('and the PA sees those two and nothing else',
-  /if \(Auth\.places\(\)\) return all\.filter\(s => s\.signs\)/.test(appjs), true);
+check('and the PA sees those two, their own run, and Status',
+  /if \(Auth\.places\(\)\) return all\.filter\(s => s\.signs \|\| s\.id === 'approvals'\)/.test(appjs), true);
 check('Download lists what is waiting for the HOD’s signature',
   /s\.status === SIGNING_STATUS && kindOf\(s\) === 'claim'/.test(signingjs), true);
 /* Putting a scan on a card is not sending it. It can be looked at and taken

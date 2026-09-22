@@ -185,10 +185,11 @@ function activeSteps () {
        approvers get the queue, and whoever collects the finished forms gets
        the shelf they end up on and nothing else. A queue of decisions that
        will never be yours to make is not information, it is furniture. */
-    /* The PA is the exception among the approvers: their part is a
-       signature on paper, so their app is the paper going out and coming
-       back — two pages, and not the table. */
-    if (Auth.places()) return all.filter(s => s.signs);
+    /* The PA's own run is the paper going out and coming back, and Status
+       sits beside it: a stage of the queue is hers, and the months she is
+       about to be handed are on that table before they reach her. Reading
+       where a month got to is not a decision she cannot make. */
+    if (Auth.places()) return all.filter(s => s.signs || s.id === 'approvals');
     return all.filter(s =>
       (s.id === 'approvals' && Auth.approves()) ||
       (s.id === 'history' && Auth.keepsRecords()));
