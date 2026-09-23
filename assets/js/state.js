@@ -692,6 +692,53 @@ function invoiceTotals (S, items) {
   return { sub, tax, total: round2(sub + tax) };
 }
 
+/* -------------------------------------------------------------------
+   One document per person, per month, per kind
+
+   A month should hold one invoice, and usually does. It holds two when the
+   same one was sent twice -- a second tab, a browser that retried, a claim
+   sent again by hand -- and then every screen has to pick one. They picked
+   differently: the status table took the first the list happened to return
+   and the payment advice page took the last, so the same invoice read as
+   approved on one screen and "with the project manager" on the other, and
+   an advice that was ready sat there locked.
+
+   So the choice is made in one place and it is the same choice everywhere:
+   the copy that has got furthest, and the newest of those if two are level.
+   A decision already taken is the one that counts; a duplicate left behind
+   at an earlier stage does not undo it.
+   ------------------------------------------------------------------- */
+
+const SUBMISSION_RANK = {
+  complete: 5,
+  pending_signature: 4,
+  pending_boss: 3,
+  pending_manager: 2,
+  returned: 1
+};
+
+/** how far along one submission is, as a number that can be compared */
+const submissionRank = sub => SUBMISSION_RANK[String((sub || {}).status || '')] || 0;
+
+/** when it last moved, for two that are level */
+const submissionWhen = sub =>
+  String((sub || {}).updated_at || (sub || {}).created_at || '');
+
+/**
+ * The one of these that speaks for the month.
+ * @param {Array} list submissions that are already the same person, month
+ *        and kind — this only decides between them
+ */
+function furthestAlong (list) {
+  return (list || []).reduce((best, sub) => {
+    if (!best) return sub;
+    const d = submissionRank(sub) - submissionRank(best);
+    if (d > 0) return sub;
+    if (d < 0) return best;
+    return submissionWhen(sub) > submissionWhen(best) ? sub : best;
+  }, null) || null;
+}
+
 /* ---------------- what is being sent for approval ---------------- */
 
 /* A month is two documents, and they are not the same document. The invoice

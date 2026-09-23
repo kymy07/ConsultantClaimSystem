@@ -87,6 +87,9 @@ jobs:
       - name: Test who may resubmit a returned document
         run: node test/resubmit-owner.test.js
 
+      - name: Test a month that holds the same document twice
+        run: node test/furthest-along.test.js
+
       # Added with the screens they cover, but never run — a test nothing
       # runs is a comment that takes longer to write.
       - name: Test the archive Download all builds

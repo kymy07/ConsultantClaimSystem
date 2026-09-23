@@ -299,7 +299,12 @@ function signingMonthTables (host, rows, columns, cells, options) {
       const who = String(n || '').trim();
       if (who) byName.set(who, null);
     });
-    entry.subs.forEach(sub => byName.set(String(sub.consultant || '').trim() || '(no name)', sub));
+    /* Two of the same document in one month: the row is the one that has
+       got furthest, not whichever the list happened to end on. */
+    entry.subs.forEach(sub => {
+      const who = String(sub.consultant || '').trim() || '(no name)';
+      byName.set(who, furthestAlong([byName.get(who), sub].filter(Boolean)));
+    });
 
     [...byName.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -530,10 +535,10 @@ function downloadLine (name, month, kind, claim) {
   /* Printable once the HOD has approved it, and still printable after the
      month is closed: a copy can be needed late, or again. What is not
      printable is a document that has not come back from the approvers. */
-  const closedClaim = kind === 'claim' && !claim ? signingSubs.filter(s =>
+  const closedClaim = kind === 'claim' && !claim ? furthestAlong(signingSubs.filter(s =>
     kindOf(s) === 'claim' && s.status === 'complete' &&
     String(s.consultant || '').trim() === String(name || '').trim() &&
-    Number(s.period_year) === month.y && Number(s.period_month) === month.m)[0] || null : null;
+    Number(s.period_year) === month.y && Number(s.period_month) === month.m)) : null;
   const doc = kind === 'claim' ? (claim || closedClaim) : null;
   const advice = kind === 'advice' ? adviceFor(where) : null;
   const printable = s => !!s && (s.status === SIGNING_STATUS || s.status === 'complete');
@@ -1424,21 +1429,21 @@ function adviceUnlocked (invoice) {
 /** the invoice for one person and month, whatever stage it has reached */
 function monthInvoice (name, year, month) {
   const who = String(name || '').trim();
-  return signingSubs.filter(s =>
+  return furthestAlong(signingSubs.filter(s =>
     kindOf(s) === 'invoice' &&
     String(s.consultant || '').trim() === who &&
     Number(s.period_year) === Number(year) &&
-    Number(s.period_month) === Number(month))[0] || null;
+    Number(s.period_month) === Number(month)));
 }
 
 /** the advice for one person and month, whatever stage it has reached */
 function adviceFor (sub) {
   const who = String(sub.consultant || '').trim();
-  return signingSubs.filter(s =>
+  return furthestAlong(signingSubs.filter(s =>
     kindOf(s) === 'advice' &&
     String(s.consultant || '').trim() === who &&
     Number(s.period_year) === Number(sub.period_year) &&
-    Number(s.period_month) === Number(sub.period_month))[0] || null;
+    Number(s.period_month) === Number(sub.period_month)));
 }
 
 /** where one advice has got, in the words the page uses */

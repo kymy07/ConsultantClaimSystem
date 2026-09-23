@@ -312,11 +312,13 @@ function monthsSeen () {
 
 /** the submission for one person, one month, one document — or null */
 function submissionFor (name, when, kind) {
-  return subs.filter(s =>
+  // the copy that has got furthest, which is the same one every other screen
+  // reads — see furthestAlong() in state.js
+  return furthestAlong(subs.filter(s =>
     String(s.consultant || '').trim() === name &&
     Number(s.period_year) === when.y &&
     Number(s.period_month) === when.m + 1 &&
-    kindOf(s) === kind)[0] || null;
+    kindOf(s) === kind));
 }
 
 function paintApprovals () {
