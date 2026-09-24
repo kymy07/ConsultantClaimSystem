@@ -833,8 +833,8 @@ function uploadLine (row, kind) {
   const doc = signingDocument(label, meta, []);
   if (!target && !filed) doc.classList.add('signdoc-quiet');
 
-  const words = held ? 'Ready to submit'
-    : filed ? 'Uploaded'
+  const words = held ? 'Uploading\u2026'
+    : filed ? 'Done'
       : target ? 'Not uploaded'
         : uploadWaitingWords(row, kind);
   const badge = statusBadge(words);
@@ -879,7 +879,7 @@ function invoiceUploadLine (row) {
     'added automatically \u2014 nothing to upload', [look]);
   auto.classList.add('signfiled');
   cell.appendChild(auto);
-  const badge = statusBadge('Automatic');
+  const badge = statusBadge('Done');
   badge.classList.add('done');
   return [doc, badge, cell];
 }
@@ -929,7 +929,7 @@ function uploadSlot (row, kind, filed, target, file) {
        be looked at, and offers to let it go again — all three, because the
        only thing worse than the wrong scan is the wrong scan nobody read. */
     const ready = signingDocument(file.name,
-      `${Math.max(1, Math.round(file.size / 1024))} KB \u00b7 Ready to submit`, [
+      `${Math.max(1, Math.round(file.size / 1024))} KB \u00b7 Uploading\u2026`, [
         labelledIcon('view', 'View', `View the signed ${what} chosen for ${who}`,
                      () => openFilePreview(`${row.consultant || ''} \u2014 ${periodOf(row)}`,
                                            file.name, file)),
@@ -960,8 +960,7 @@ function uploadSlot (row, kind, filed, target, file) {
         inp.value = '';
         return;
       }
-      attached.set(key, picked);
-      renderSignUpload();
+      uploadNow(key, picked, inp, hint);
     });
     pick.appendChild(inp);
     const hint = document.createElement('small');
@@ -990,6 +989,39 @@ function uploadSlot (row, kind, filed, target, file) {
   // a new file chosen over one on file: say which it is about to replace
   if (filed) cell.appendChild(onFileNote(filed, row, kind, true));
   return cell;
+}
+
+/**
+ * Choosing a file is uploading it.
+ *
+ * It used to be held in this browser until Save was pressed. The cell said
+ * "Ready to submit", the person had chosen the file and reasonably took it
+ * as sent — and it was one reload away from being lost, with nothing on the
+ * record. Now it goes up straight away and the line says Done, because it
+ * is. A wrong file is put right the same way: choose again, and the newer
+ * one takes its place.
+ */
+async function uploadNow (key, file, inp, hint) {
+  if (signingBusy) { toast('Wait for the upload already running to finish.', true); inp.value = ''; return; }
+  attached.set(key, file);
+  const job = heldJobs().filter(j => j.key === key)[0];
+  if (!job) { attached.delete(key); inp.value = ''; return; }
+
+  signingBusy = true;
+  inp.disabled = true;
+  inp.setAttribute('aria-busy', 'true');
+  if (hint) hint.textContent = 'Uploading ' + file.name + '\u2026';
+  try {
+    await fileSignedCopy(job, (Auth.user() || {}).name || myEmail());
+    archiveLoaded = false;               // everybody else reads the newest copy
+    toast('Uploaded. ' + (job.sub.consultant || '') + ' \u2014 ' + periodOf(job.sub) + ' is on the record.');
+  } catch (err) {
+    attached.delete(key);
+    toast('Could not upload ' + file.name + ': ' + (err.message || 'try again.'), true);
+  } finally {
+    signingBusy = false;
+  }
+  await renderSignUpload();
 }
 
 /** the signed copy on the record, drawn as done */
@@ -1085,16 +1117,15 @@ async function dropSuperseded (before, kept) {
  * work is lost to a reload. Closing a month is not safe to do early: a month
  * that is closed has been handed on.
  *
- * So Save files whatever is here and leaves the months open, and Submit is
- * offered only when nothing on the page is still waiting for a copy — every
- * document that can have one has one, chosen or already filed. Until then
- * there is nothing to decide: save what arrived, and come back.
+ * So each copy is filed the moment it is chosen (see uploadNow) and leaves
+ * the months open, and Submit is offered only when nothing on the page is
+ * still waiting for a copy. Until then there is nothing to decide: upload
+ * what arrived, and come back.
  */
 function submitBar (rows) {
   const bar = document.createElement('div');
   bar.className = 'signsubmit';
 
-  const here = attached.size;
   const missing = copiesMissing(rows);
   const closing = closableSubs(rows).concat(heldJobs().map(j => j.sub));
   const ready = !missing && closing.length > 0;
@@ -1107,30 +1138,18 @@ function submitBar (rows) {
   const said = document.createElement('p');
   said.className = 'signsaid';
   said.setAttribute('role', 'status');
-  said.textContent = here && missing
-    ? here + ' signed cop' + (here === 1 ? 'y is' : 'ies are') + ' here. Save files ' +
-      (here === 1 ? 'it' : 'them') + ' on the record and leaves the month open; ' +
-      missing + ' document' + (missing === 1 ? ' is' : 's are') + ' still waiting for one. ' +
-      'A scan is only on the record once it is saved.'
-    : here
-      ? 'Everything is in. Save files ' + (here === 1 ? 'this copy' : 'these copies') +
-        ' and leaves the months open; Submit files ' + (here === 1 ? 'it' : 'them') +
-        ' and closes ' + monthWords + '.'
-      : missing
-        ? missing + ' document' + (missing === 1 ? '' : 's') + ' on this page ' +
-          (missing === 1 ? 'has' : 'have') + ' no signed copy yet. Save each one as it ' +
-          'arrives; the months are closed together when the last of them is in.'
-        : closing.length
-          ? 'Every signed copy is on the record. Submit closes ' + monthWords +
-            ' and files ' + (months === 1 ? 'it' : 'them') + ' in History.'
-          : 'Nothing here is waiting to be filed or closed.';
+  said.textContent = missing
+    ? missing + ' document' + (missing === 1 ? '' : 's') + ' on this page still need' +
+      (missing === 1 ? 's' : '') + ' a signed copy. Each file is saved the moment you choose it; ' +
+      'the months are closed together when the last of them is in.'
+    : closing.length
+      ? 'Every signed copy is on the record. Submit closes ' + monthWords +
+        ' and files ' + (months === 1 ? 'it' : 'them') + ' in History.'
+      : 'Nothing here is waiting to be filed or closed.';
   bar.appendChild(said);
 
   const row = document.createElement('div');
   row.className = 'btnrow';
-  const keep = button('Save', 'ghost', () => saveSigned(keep));
-  keep.disabled = !here;
-  row.appendChild(keep);
   /* Green, and only when the whole page can go: the colour is the answer to
      "is this ready?", which is the only question anybody asks of this button. */
   const go = button('Submit and close the month', ready ? 'go' : '', () => submitSigned(go, rows));
@@ -1186,50 +1205,6 @@ async function fileSignedCopy (job, by) {
   await dropSuperseded(before, kept);
   attached.delete(job.key);
   return sub;
-}
-
-/**
- * Keep what is here.
- *
- * The copies go up and the months stay open. This is the button for every
- * day but the last one: scans come back from the HOD a few at a time, and
- * each is safe on the record the moment it arrives.
- */
-async function saveSigned (go) {
-  if (signingBusy) return;
-  const jobs = heldJobs();
-  if (!jobs.length) { toast('Nothing has been chosen yet.', true); return; }
-
-  signingBusy = true;
-  const was = go.textContent;
-  go.disabled = true;
-  let done = 0;
-  const failed = [];
-  const by = (Auth.user() || {}).name || myEmail();
-
-  try {
-    for (let i = 0; i < jobs.length; i++) {
-      go.textContent = 'Saving ' + (i + 1) + ' of ' + jobs.length + '…';
-      try {
-        await fileSignedCopy(jobs[i], by);
-        done++;
-      } catch (err) {
-        failed.push((jobs[i].sub.consultant || jobs[i].sub.id) + ': ' + err.message);
-      }
-    }
-  } finally {
-    signingBusy = false;
-    go.disabled = false;
-    go.textContent = was;
-  }
-
-  archiveLoaded = false;            // everybody else reads the newest copy
-  toast(failed.length
-    ? done + ' saved. ' + failed.length + ' could not be: ' + failed[0]
-    : done + ' signed cop' + (done === 1 ? 'y is' : 'ies are') + ' on the record. ' +
-      (done === 1 ? 'That month stays' : 'Those months stay') + ' open until everything is in.',
-    !!failed.length);
-  await renderSignUpload();
 }
 
 /**

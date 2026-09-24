@@ -415,12 +415,14 @@ check('and the PA sees those two, their own run, and Status',
   /if \(Auth\.places\(\)\) return all\.filter\(s => s\.signs \|\| s\.id === 'approvals'\)/.test(appjs), true);
 check('Download lists what is waiting for the HOD’s signature',
   /s\.status === SIGNING_STATUS && kindOf\(s\) === 'claim'/.test(signingjs), true);
-/* Putting a scan on a card is not sending it. It can be looked at and taken
-   off again; one Submit at the bottom is what closes the months and hands
+/* Choosing a scan files it — the PA took a chosen file as sent, and a file
+   only held in the browser was one reload from gone — but filing is still
+   not closing: one Submit at the bottom is what closes the months and hands
    them to whoever collects the paper. */
-check('a scan put on a card is held, not sent',
+check('a scan is filed the moment it is chosen, and closes nothing',
   /const attached = new Map\(\)/.test(signingjs) &&
-  /attached\.set\(key, picked\)/.test(signingjs) &&
+  /async function uploadNow \(key, file, inp, hint\) \{[\s\S]{0,200}attached\.set\(key, file\)/.test(signingjs) &&
+  !/async function uploadNow[\s\S]{0,900}Sync\.act\(/.test(signingjs) &&
   /const key = target && target\.key/.test(signingjs), true);
 /* And a payment advice takes one whether or not it was ever written. It did
    not have to be — it is the invoice's own figures, and Download prints it
@@ -448,12 +450,15 @@ check('the copy already on file can be read too',
 /* Saving is not closing, and they were one button. A scan is safe on the
    record the moment somebody has it — holding a month's worth in this
    browser until the last person's arrives is how an afternoon is lost to a
-   reload — but a month that is closed has been handed on. So Save files what
-   is there and leaves the months open. */
-check('Save files what has arrived and leaves the months open',
+   reload — but a month that is closed has been handed on. So a copy is
+   filed the moment it is chosen, and the months stay open. There is no Save
+   to forget: a file that only sat in the browser read as sent, and was not. */
+check('a copy is filed the moment it is chosen, and the months stay open',
   /host\.appendChild\(submitBar\(waiting\)\)/.test(signingjs) &&
-  /button\('Save', 'ghost', \(\) => saveSigned\(keep\)\)/.test(signingjs) &&
-  /async function saveSigned/.test(signingjs) &&
+  /uploadNow\(key, picked, inp, hint\);/.test(signingjs) &&
+  /async function uploadNow[\s\S]{0,700}await fileSignedCopy\(job,/.test(signingjs) &&
+  !/button\('Save', 'ghost'/.test(signingjs) && !/function saveSigned/.test(signingjs) &&
+  /: filed \? 'Done'/.test(signingjs) &&
   /async function fileSignedCopy[\s\S]{0,1400}await Sync\.store\(/.test(signingjs) &&
   (signingjs.match(/Sync\.act\(/g) || []).length === 1, true);
 /* And Submit is not offered until nothing on the page is still waiting for
