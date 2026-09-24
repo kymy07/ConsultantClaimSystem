@@ -1079,15 +1079,18 @@ check('a bank statement is filed as its own kind, behind the redaction reminder'
   /'Bank Statement'\]\.forEach/.test(archivejs) &&
   /filedDocument\('Bank Statement',/.test(signingjs), true);
 /* A month paid before this app — August, for somebody who started here in
-   September — has nothing filed and so had no line to put a statement on.
-   History draws months that have only a statement, and offers a statement
-   for any month and year, through the same reminder and tick-box. */
-check('a bank statement can be filed for a month with no line yet',
+   September — had no line to put a statement on. Every month from August
+   2026 to a year on is listed with its statement or the way to add it; a
+   month not started yet is listed but not open. */
+check('bank statements are listed month by month from August 2026',
   /rows\.concat\(statements\)\.forEach/.test(archivejs) &&
   /\.filter\(r => r\.kind === BANK_KIND\)/.test(archivejs) &&
-  /function bankOtherMonth \(\) \{\s*if \(!mayFileBank\(\)\) return null;/.test(archivejs) &&
-  /slot\.appendChild\(bankUploader\(name, when, !!on\)\)/.test(archivejs) &&
-  /if \(!rows\.length && !statements\.length\) \{\s*const other = bankOtherMonth\(\);/.test(archivejs), true);
+  /const BANK_FIRST = \{ y: 2026, m: 8 \};/.test(archivejs) &&
+  /const last = Math\.max\(first \+ BANK_SPAN, here\);/.test(archivejs) &&
+  /function bankYear \(\) \{\s*if \(!mayFileBank\(\)\) return null;/.test(archivejs) &&
+  /row\.appendChild\(bankCell\(name, when\)\)/.test(archivejs) &&
+  /Opens in \$\{m\.textContent\}/.test(archivejs) &&
+  !/function bankOtherMonth/.test(archivejs), true);
 /* History recorded a month as its signed time sheet alone, so a month that
    went to Finance as three documents read here as one. Each of the three is
    on the row now, with its own View and Download, and the month one zip. */

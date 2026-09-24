@@ -1462,8 +1462,10 @@ textarea:focus{outline:2px solid #bcd6ea;border-color:var(--navy-soft)}
 /* a statement for a month that has no line yet */
 .bankother{margin-top:24px;padding:16px 18px;border:1px dashed #c6d2dd;border-radius:12px;background:#fff}
 .bankother h3{margin:0 0 4px;font-size:15px}
-.bankother-pick{align-items:flex-end;gap:12px;margin:12px 0 4px}
-.bankother-pick select{width:auto;min-width:140px}
+.bankother-who{display:inline-flex;flex-direction:column;gap:4px;margin:12px 0}
+.bankother-who select{width:auto;min-width:220px}
+.banktable th:first-child{width:28%}
+.bankother .history-table-wrap{margin-top:12px}
 /* the name of the file, then the reference under it */
 .history-document-words{display:block;max-width:100%;min-width:0}
 .history-document-name{

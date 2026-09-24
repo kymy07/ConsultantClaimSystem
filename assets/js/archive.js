@@ -318,7 +318,7 @@ function paintHistory () {
   if (rows.length) host.appendChild(count);
 
   if (!rows.length && !statements.length) {
-    const other = bankOtherMonth();
+    const other = bankYear();
     if (other) host.appendChild(other);
     const empty = document.createElement('p');
     empty.className = 'emptynote';
@@ -345,21 +345,41 @@ function paintHistory () {
   // newest month first, now that two lists feed it
   [...months.keys()].sort().reverse()
     .forEach(key => host.appendChild(historyTable(months.get(key), roster)));
-  const other = bankOtherMonth();
+  const other = bankYear();
   if (other) host.appendChild(other);
 }
 
+/* The first month a statement is asked for, and how far ahead the list runs.
+   August 2026 is where these claims start; the list reaches a year on from
+   it, and keeps reaching to the current month after that, so it never goes
+   stale on the first of January. */
+const BANK_FIRST = { y: 2026, m: 8 };
+const BANK_SPAN = 12;
+
+/** every month the list shows: August 2026 to a year on, or to now if later */
+function bankMonths () {
+  const now = new Date();
+  const here = now.getFullYear() * 12 + now.getMonth();          // months, zero-based
+  const first = BANK_FIRST.y * 12 + (BANK_FIRST.m - 1);
+  const last = Math.max(first + BANK_SPAN, here);
+  const out = [];
+  for (let i = first; i <= last; i++) {
+    out.push({ period_year: Math.floor(i / 12), period_month: (i % 12) + 1, future: i > here });
+  }
+  return out;
+}
+
 /**
- * A bank statement for a month that has no line here yet.
+ * Bank statements, one line a month, for one person.
  *
- * History draws a month once something is filed for it, and a month paid
- * before this app — August, for somebody who started claiming here in
- * September — has nothing filed and so no line to put a statement on. This
- * picks the person, the month and the year, and hands over to the same
- * reminder, tick-box and file as every other statement. Once it is up, the
- * month has a line of its own like any other.
+ * Statements belong to months, not to documents, and a month paid before
+ * this app — or one whose claim has not been filed yet — had no line in the
+ * tables above to put one on. So every month from August 2026 to a year on
+ * is listed here in order, each with its statement or the way to add it. A
+ * month that has not started yet is listed but not open: there is no
+ * statement for a payment that has not been made.
  */
-function bankOtherMonth () {
+function bankYear () {
   if (!mayFileBank()) return null;
   const names = collectorRoster();
   if (!names.length) return null;
@@ -367,23 +387,13 @@ function bankOtherMonth () {
   const card = document.createElement('div');
   card.className = 'bankother';
   const head = document.createElement('h3');
-  head.textContent = 'Bank statement for another month';
+  head.textContent = 'Bank statements';
   card.appendChild(head);
   const lead = document.createElement('p');
   lead.className = 'signhint';
-  lead.textContent = 'For a paid month that has no line above yet \u2014 one from before your ' +
-    'claims were sent through this app, for example.';
+  lead.textContent = 'One for each paid month, from August 2026. Black out your balance and ' +
+    'other transactions before you upload.';
   card.appendChild(lead);
-
-  const pickers = document.createElement('div');
-  pickers.className = 'btnrow bankother-pick';
-  const labelled = (text, el) => {
-    const l = document.createElement('label');
-    l.className = 'fieldlabel';
-    l.appendChild(document.createTextNode(text));
-    l.appendChild(el);
-    return l;
-  };
 
   // the person: a consultant has one, the administrator chooses
   const who = document.createElement('select');
@@ -392,47 +402,61 @@ function bankOtherMonth () {
     o.value = n; o.textContent = n;
     who.appendChild(o);
   });
-  if (names.length > 1) pickers.appendChild(labelled('Consultant', who));
-
-  // last month by default: the one a statement usually arrives for
-  const now = new Date();
-  const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const month = document.createElement('select');
-  MONTHS.forEach((m, i) => {
-    const o = document.createElement('option');
-    o.value = String(i + 1); o.textContent = m;
-    month.appendChild(o);
-  });
-  month.value = String(last.getMonth() + 1);
-  pickers.appendChild(labelled('Month', month));
-
-  const year = document.createElement('select');
-  [now.getFullYear(), now.getFullYear() - 1].forEach(y => {
-    const o = document.createElement('option');
-    o.value = String(y); o.textContent = String(y);
-    year.appendChild(o);
-  });
-  year.value = String(last.getFullYear());
-  pickers.appendChild(labelled('Year', year));
-  card.appendChild(pickers);
+  if (names.length > 1) {
+    const l = document.createElement('label');
+    l.className = 'fieldlabel bankother-who';
+    l.appendChild(document.createTextNode('Consultant'));
+    l.appendChild(who);
+    card.appendChild(l);
+  }
 
   const slot = document.createElement('div');
   card.appendChild(slot);
   const draw = () => {
     slot.innerHTML = '';
     const name = who.value || names[0];
-    const when = { period_year: Number(year.value), period_month: Number(month.value) };
-    const on = bankFor(name, when.period_year, when.period_month);
-    if (on) {
-      const note = document.createElement('p');
-      note.className = 'signhint';
-      note.textContent = `There is already a statement for ${MONTHS[when.period_month - 1]} ` +
-        `${when.period_year} \u2014 uploading again replaces it.`;
-      slot.appendChild(note);
-    }
-    slot.appendChild(bankUploader(name, when, !!on));
+    const wrap = document.createElement('div');
+    wrap.className = 'history-table-wrap';
+    wrap.tabIndex = 0;
+    wrap.setAttribute('role', 'region');
+    wrap.setAttribute('aria-label', 'Bank statements for ' + name);
+    const table = document.createElement('table');
+    table.className = 'history-table banktable';
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+    ['Month', 'Bank Statement'].forEach(t => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = t;
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    const body = document.createElement('tbody');
+    bankMonths().forEach(when => {
+      const row = document.createElement('tr');
+      const m = document.createElement('th');
+      m.scope = 'row';
+      m.textContent = `${MONTHS[when.period_month - 1]} ${when.period_year}`;
+      row.appendChild(m);
+      if (when.future && !bankFor(name, when.period_year, when.period_month)) {
+        const td = document.createElement('td');
+        td.setAttribute('data-label', 'Bank Statement');
+        const quiet = document.createElement('span');
+        quiet.className = 'history-missing';
+        quiet.textContent = `Opens in ${m.textContent}`;
+        td.appendChild(quiet);
+        row.appendChild(td);
+      } else {
+        row.appendChild(bankCell(name, when));
+      }
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    wrap.appendChild(table);
+    slot.appendChild(wrap);
   };
-  [who, month, year].forEach(el => el.addEventListener('change', draw));
+  who.addEventListener('change', draw);
   draw();
   return card;
 }
