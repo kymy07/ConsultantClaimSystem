@@ -468,7 +468,10 @@ check('a copy is filed the moment it is chosen, and the months stay open',
 check('a closed month can be reopened from History, with a reason',
   /if \(Auth\.places\(\) && closedInMonth\(rec\)\.length\)/.test(signingjs) &&
   /filedAction\('unlock', 'Reopen month',/.test(signingjs) &&
-  /await Sync\.act\(sub\.id, 'reopen', why\.trim\(\)/.test(signingjs) &&
+  /await Sync\.act\(sub\.id, 'reopen', String\(why \|\| ''\)\.trim\(\)/.test(signingjs) &&
+  /const again = reopenEveryoneBar\(rows\);/.test(signingjs) &&
+  /filedAction\('unlock', 'Reopen for everyone',/.test(signingjs) &&
+  /const \{ done, failed \} = await reopenSubs\(closed, why, control\);/.test(signingjs) &&
   /\(kindOf\(s\) === 'claim' \|\| kindOf\(s\) === 'advice'\) && s\.status === 'complete'/.test(signingjs) &&
   /"reopen"/.test(fs.readFileSync(path.join(ROOT, 'docs/BDOS-CCS-Endpoints.md'), 'utf8')), true);
 /* And Submit is not offered until nothing on the page is still waiting for

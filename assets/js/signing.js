@@ -1379,6 +1379,108 @@ async function renderFiled () {
   count.textContent = `${rows.length} signed time sheet${rows.length === 1 ? '' : 's'} filed.`;
   host.appendChild(count);
   host.appendChild(filedTable(pairs));
+  const again = reopenEveryoneBar(rows);
+  if (again) host.appendChild(again);
+}
+
+/**
+ * Reopen a whole month, for everybody in it, from the foot of History.
+ *
+ * Submit on Re-Upload closes a month for everybody at once, so taking it
+ * back is offered the same way: one button, one reason, every closed time
+ * sheet and payment advice in that month. It is a month and not the whole
+ * page, chosen here and defaulting to the newest, because History reaches
+ * back years and "everything" would reopen last March along with this one.
+ */
+function reopenEveryoneBar (rows) {
+  if (!Auth.places()) return null;
+  const months = new Map();
+  rows.forEach(rec => {
+    const closed = closedInMonth(rec);
+    if (!closed.length) return;
+    const key = `${rec.period_year}-${String(rec.period_month).padStart(2, '0')}`;
+    if (!months.has(key)) months.set(key, { rec: rec, people: new Set(), subs: [] });
+    const m = months.get(key);
+    m.people.add(String(rec.consultant || '').trim());
+    closed.forEach(s => { if (m.subs.indexOf(s) < 0) m.subs.push(s); });
+  });
+  if (!months.size) return null;
+
+  const bar = document.createElement('div');
+  bar.className = 'signsubmit reopenall';
+  const said = document.createElement('p');
+  said.className = 'signsaid';
+  said.textContent = 'Need to add or replace a signed copy after a month was closed? ' +
+    'Reopen it for everybody, and Submit on Re-Upload closes it again.';
+  bar.appendChild(said);
+
+  const row = document.createElement('div');
+  row.className = 'btnrow';
+  const pick = document.createElement('select');
+  pick.setAttribute('aria-label', 'Month to reopen');
+  [...months.keys()].sort().reverse().forEach(key => {
+    const m = months.get(key);
+    const o = document.createElement('option');
+    o.value = key;
+    o.textContent = `${monthFolder(m.rec)} \u00b7 ${m.people.size} ${m.people.size === 1 ? 'person' : 'people'}`;
+    pick.appendChild(o);
+  });
+  row.appendChild(pick);
+  const go = filedAction('unlock', 'Reopen for everyone',
+    'Reopen every closed time sheet and payment advice in the chosen month',
+    control => {
+      const m = months.get(pick.value);
+      if (m) reopenEveryone(m, control);
+    });
+  row.appendChild(go);
+  bar.appendChild(row);
+  return bar;
+}
+
+async function reopenEveryone (m, control) {
+  if (signingBusy) return;
+  const month = monthFolder(m.rec);
+  const people = [...m.people];
+  const why = window.prompt(
+    `Reopen ${month} for everybody? (${people.length} ${people.length === 1 ? 'person' : 'people'})\n\n` +
+    people.join('\n') + '\n\n' +
+    'Their time sheets and payment advice go back to Re-Upload; the signed copies on file stay. ' +
+    'Submit closes the month again.\n\nWhy is it being reopened? (kept in the record)', '');
+  if (why === null) return;
+  const r = await reopenSubs(m.subs, why, control);
+  toast(r.failed.length
+    ? `${r.done} reopened. ${r.failed[0]}.`
+    : `${month} is open again for ${people.length} ${people.length === 1 ? 'person' : 'people'}. ` +
+      'Add or replace signed copies on Re-Upload.', !!r.failed.length);
+  await renderFiled();
+}
+
+/** send each of these back to the signing stage, holding the control while it runs */
+async function reopenSubs (subs, why, control) {
+  signingBusy = true;
+  control.disabled = true;
+  control.setAttribute('aria-busy', 'true');
+  let done = 0;
+  const failed = [];
+  try {
+    for (const sub of subs) {
+      try {
+        await Sync.act(sub.id, 'reopen', String(why || '').trim() || 'Reopened to add or replace a signed copy');
+        done++;
+      } catch (err) {
+        failed.push((sub.consultant ? sub.consultant + ', ' : '') + kindLabel(kindOf(sub)) + ': ' +
+          (err.status === 403 ? 'this account may not reopen it'
+            : err.status === 400 ? 'the server cannot reopen a month yet'
+              : err.status === 409 ? 'it is not closed any more'
+                : (err.message || 'could not be reopened')));
+      }
+    }
+  } finally {
+    signingBusy = false;
+    control.disabled = false;
+    control.removeAttribute('aria-busy');
+  }
+  return { done: done, failed: failed };
 }
 
 /** the documents of one person's month that are closed and can be opened again */
@@ -1414,29 +1516,7 @@ async function reopenMonth (rec, control) {
     'Submit closes it again.\n\nWhy is it being reopened? (kept in the record)', '');
   if (why === null) return;
 
-  signingBusy = true;
-  control.disabled = true;
-  control.setAttribute('aria-busy', 'true');
-  let done = 0;
-  const failed = [];
-  try {
-    for (const sub of closed) {
-      try {
-        await Sync.act(sub.id, 'reopen', why.trim() || 'Reopened to add or replace a signed copy');
-        done++;
-      } catch (err) {
-        failed.push(kindLabel(kindOf(sub)) + ': ' +
-          (err.status === 403 ? 'this account may not reopen it'
-            : err.status === 400 ? 'the server cannot reopen a month yet'
-              : err.status === 409 ? 'it is not closed any more'
-                : (err.message || 'could not be reopened')));
-      }
-    }
-  } finally {
-    signingBusy = false;
-    control.disabled = false;
-    control.removeAttribute('aria-busy');
-  }
+  const { done, failed } = await reopenSubs(closed, why, control);
   toast(failed.length
     ? `${done} reopened. ${failed[0]}.`
     : `${who} \u2014 ${month} is open again. Add or replace its signed copies on Re-Upload.`,

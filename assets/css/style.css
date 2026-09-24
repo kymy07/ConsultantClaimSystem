@@ -1445,6 +1445,8 @@ textarea:focus{outline:2px solid #bcd6ea;border-color:var(--navy-soft)}
 /* a document of the month that is not on file yet: said, and quieter */
 .filed-missing .history-document-name{color:var(--muted)}
 .filedmonthzip{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.reopenall .btnrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.reopenall select{width:auto;min-width:220px;max-width:340px;flex:0 1 auto}
 /* a bank statement: the reminder, the box to tick, then the file */
 .bankupload{margin-top:10px}
 .bankpanel{display:flex;flex-direction:column;align-items:flex-start;gap:8px;
