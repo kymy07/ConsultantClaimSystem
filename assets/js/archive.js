@@ -294,6 +294,13 @@ function paintHistory () {
   }
 
   const rows = historyRows();
+  /* Months with a bank statement and nothing else are months too: a month
+     paid before this app, say, where the statement is the only paper there
+     is. They get their line, under the same two filters. */
+  const statements = latestCopies(archive)
+    .filter(r => r.kind === BANK_KIND)
+    .filter(r => !historyWho || String(r.consultant || '').trim() === historyWho)
+    .filter(r => !historyYear || String(r.period_year) === historyYear);
   host.innerHTML = '';
   const count = document.createElement('p');
   count.className = 'historycount';
@@ -310,7 +317,9 @@ function paintHistory () {
   }
   if (rows.length) host.appendChild(count);
 
-  if (!rows.length) {
+  if (!rows.length && !statements.length) {
+    const other = bankOtherMonth();
+    if (other) host.appendChild(other);
     const empty = document.createElement('p');
     empty.className = 'emptynote';
     empty.textContent = (historyWho || historyYear)
@@ -327,13 +336,105 @@ function paintHistory () {
   }
 
   const months = new Map();
-  rows.forEach(r => {
-    const key = `${r.period_year}-${r.period_month}`;
+  rows.concat(statements).forEach(r => {
+    const key = `${r.period_year}-${String(r.period_month).padStart(2, '0')}`;
     if (!months.has(key)) months.set(key, []);
     months.get(key).push(r);
   });
   const roster = collectorRoster();
-  months.forEach(records => host.appendChild(historyTable(records, roster)));
+  // newest month first, now that two lists feed it
+  [...months.keys()].sort().reverse()
+    .forEach(key => host.appendChild(historyTable(months.get(key), roster)));
+  const other = bankOtherMonth();
+  if (other) host.appendChild(other);
+}
+
+/**
+ * A bank statement for a month that has no line here yet.
+ *
+ * History draws a month once something is filed for it, and a month paid
+ * before this app — August, for somebody who started claiming here in
+ * September — has nothing filed and so no line to put a statement on. This
+ * picks the person, the month and the year, and hands over to the same
+ * reminder, tick-box and file as every other statement. Once it is up, the
+ * month has a line of its own like any other.
+ */
+function bankOtherMonth () {
+  if (!mayFileBank()) return null;
+  const names = collectorRoster();
+  if (!names.length) return null;
+
+  const card = document.createElement('div');
+  card.className = 'bankother';
+  const head = document.createElement('h3');
+  head.textContent = 'Bank statement for another month';
+  card.appendChild(head);
+  const lead = document.createElement('p');
+  lead.className = 'signhint';
+  lead.textContent = 'For a paid month that has no line above yet \u2014 one from before your ' +
+    'claims were sent through this app, for example.';
+  card.appendChild(lead);
+
+  const pickers = document.createElement('div');
+  pickers.className = 'btnrow bankother-pick';
+  const labelled = (text, el) => {
+    const l = document.createElement('label');
+    l.className = 'fieldlabel';
+    l.appendChild(document.createTextNode(text));
+    l.appendChild(el);
+    return l;
+  };
+
+  // the person: a consultant has one, the administrator chooses
+  const who = document.createElement('select');
+  names.forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    who.appendChild(o);
+  });
+  if (names.length > 1) pickers.appendChild(labelled('Consultant', who));
+
+  // last month by default: the one a statement usually arrives for
+  const now = new Date();
+  const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const month = document.createElement('select');
+  MONTHS.forEach((m, i) => {
+    const o = document.createElement('option');
+    o.value = String(i + 1); o.textContent = m;
+    month.appendChild(o);
+  });
+  month.value = String(last.getMonth() + 1);
+  pickers.appendChild(labelled('Month', month));
+
+  const year = document.createElement('select');
+  [now.getFullYear(), now.getFullYear() - 1].forEach(y => {
+    const o = document.createElement('option');
+    o.value = String(y); o.textContent = String(y);
+    year.appendChild(o);
+  });
+  year.value = String(last.getFullYear());
+  pickers.appendChild(labelled('Year', year));
+  card.appendChild(pickers);
+
+  const slot = document.createElement('div');
+  card.appendChild(slot);
+  const draw = () => {
+    slot.innerHTML = '';
+    const name = who.value || names[0];
+    const when = { period_year: Number(year.value), period_month: Number(month.value) };
+    const on = bankFor(name, when.period_year, when.period_month);
+    if (on) {
+      const note = document.createElement('p');
+      note.className = 'signhint';
+      note.textContent = `There is already a statement for ${MONTHS[when.period_month - 1]} ` +
+        `${when.period_year} \u2014 uploading again replaces it.`;
+      slot.appendChild(note);
+    }
+    slot.appendChild(bankUploader(name, when, !!on));
+  };
+  [who, month, year].forEach(el => el.addEventListener('change', draw));
+  draw();
+  return card;
 }
 
 /**

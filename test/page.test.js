@@ -1078,6 +1078,16 @@ check('a bank statement is filed as its own kind, behind the redaction reminder'
   /const mayFileBank = \(\) => typeof Auth !== 'undefined' && Auth\.prepares\(\);/.test(archivejs) &&
   /'Bank Statement'\]\.forEach/.test(archivejs) &&
   /filedDocument\('Bank Statement',/.test(signingjs), true);
+/* A month paid before this app — August, for somebody who started here in
+   September — has nothing filed and so had no line to put a statement on.
+   History draws months that have only a statement, and offers a statement
+   for any month and year, through the same reminder and tick-box. */
+check('a bank statement can be filed for a month with no line yet',
+  /rows\.concat\(statements\)\.forEach/.test(archivejs) &&
+  /\.filter\(r => r\.kind === BANK_KIND\)/.test(archivejs) &&
+  /function bankOtherMonth \(\) \{\s*if \(!mayFileBank\(\)\) return null;/.test(archivejs) &&
+  /slot\.appendChild\(bankUploader\(name, when, !!on\)\)/.test(archivejs) &&
+  /if \(!rows\.length && !statements\.length\) \{\s*const other = bankOtherMonth\(\);/.test(archivejs), true);
 /* History recorded a month as its signed time sheet alone, so a month that
    went to Finance as three documents read here as one. Each of the three is
    on the row now, with its own View and Download, and the month one zip. */
