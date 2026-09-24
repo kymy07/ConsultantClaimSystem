@@ -630,6 +630,17 @@ function historyTable (records, roster, forMonth) {
   table.className = 'history-table';
   const caption = document.createElement('caption');
   caption.textContent = month;
+  /* The month running now, picked out: with a year of months on the page,
+     "where am I" is the first question and the page should answer it. */
+  const today = new Date();
+  if (Number(first.period_year) === today.getFullYear() &&
+      Number(first.period_month) === today.getMonth() + 1) {
+    wrap.classList.add('history-current');
+    const now = document.createElement('span');
+    now.className = 'history-now';
+    now.textContent = 'This month';
+    caption.appendChild(now);
+  }
   table.appendChild(caption);
 
   /* The month is what Finance is sent, and it is one file: a folder per

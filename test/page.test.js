@@ -1082,6 +1082,12 @@ check('a bank statement is filed as its own kind, behind the redaction reminder'
    September — had no line to put a statement on. Every month from August
    2026 to a year on is listed with its statement or the way to add it; a
    month not started yet is listed but not open. */
+/* With a year of months on the page, the one running now is picked out. */
+check('History picks out the month running now',
+  /wrap\.classList\.add\('history-current'\)/.test(archivejs) &&
+  /now\.textContent = 'This month'/.test(archivejs) &&
+  /\.history-current \.history-table\{border:2px solid/.test(css) &&
+  /\.history-table caption\{padding-left:3px\}/.test(css), true);
 check('every month from August 2026 is a table of its own in History',
   /rows\.concat\(statements\)\.forEach/.test(archivejs) &&
   /\.filter\(r => r\.kind === BANK_KIND\)/.test(archivejs) &&
