@@ -1030,6 +1030,17 @@ check('uploading again replaces the file, and the page says so',
   /a new upload replaces it when saved/.test(signingjs) &&
   /const before = copiesOnFile\(sub, kind\);[\s\S]{0,300}await dropSuperseded\(before, kept\);/
     .test(signingjs), true);
+/* History recorded a month as its signed time sheet alone, so a month that
+   went to Finance as three documents read here as one. Each of the three is
+   on the row now, with its own View and Download, and the month one zip. */
+check('History shows the month’s three documents',
+  /\['Month', 'Consultant', 'Leave that month', 'Documents'\]/.test(signingjs) &&
+  /filedDocument\('Time sheet',/.test(signingjs) &&
+  /filedDocument\('Invoice', \['approved invoice'/.test(signingjs) &&
+  /filedDocument\('Payment Advice',\s*\['signed copy'/.test(signingjs) &&
+  /archiveFor\(rec\.consultant, rec\.period_year, Number\(rec\.period_month\) - 1, 'advice'\)/
+    .test(signingjs) &&
+  /control => downloadMonthZip\(rec, control\)/.test(signingjs), true);
 /* A copy on the record is the answer, so it comes first and looks finished.
    The file box sat on top of it, and a cell that opens with "Choose File"
    reads as a job not done. Replacing it is one click away, behind a button

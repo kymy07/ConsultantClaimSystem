@@ -1406,6 +1406,41 @@ async function renderFiled () {
   host.appendChild(filedTable(pairs));
 }
 
+/** one document in a filed month: what it is, where it came from, and what can be done with it */
+function filedDocument (title, meta, actions, fileName, quiet) {
+  const item = document.createElement('div');
+  item.className = 'history-document' + (quiet ? ' filed-missing' : '');
+  const words = document.createElement('div');
+  words.className = 'history-document-words';
+  const name = document.createElement('span');
+  name.className = 'history-document-name';
+  name.textContent = title;
+  // the stored file's own name is long, so it is there on hover rather than in the way
+  if (fileName) name.title = fileName;
+  words.appendChild(name);
+  const said = document.createElement('span');
+  said.className = 'history-document-meta';
+  said.textContent = meta;
+  words.appendChild(said);
+  item.appendChild(words);
+  if (actions.length) {
+    const acts = document.createElement('div');
+    acts.className = 'history-document-actions';
+    actions.forEach(a => acts.appendChild(a));
+    item.appendChild(acts);
+  }
+  return item;
+}
+
+/** an icon button with its word beside it, as the History tables draw them */
+function filedAction (icon, word, label, onClick) {
+  const b = iconButton(icon, label, 'ghost small history-icon', onClick);
+  const w = document.createElement('span');
+  w.textContent = word;
+  b.appendChild(w);
+  return b;
+}
+
 function filedTable (pairs) {
   const wrap = document.createElement('div');
   wrap.className = 'history-table-wrap';
@@ -1418,7 +1453,7 @@ function filedTable (pairs) {
 
   const head = document.createElement('thead');
   const titles = document.createElement('tr');
-  ['Month', 'Consultant', 'Leave that month', 'Signed copy'].forEach(label => {
+  ['Month', 'Consultant', 'Leave that month', 'Documents'].forEach(label => {
     const cell = document.createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
@@ -1455,48 +1490,57 @@ function filedTable (pairs) {
     }
     row.appendChild(leave);
 
+    /* The month's three documents, not the one. The row was only ever the
+       signed time sheet, so a month that went to Finance as three documents
+       was recorded here as one, and the other two had to be found somewhere
+       else. Each has its own View and Download; the month as a whole has
+       one zip, under the three. */
     const copy = document.createElement('td');
-    copy.setAttribute('data-label', 'Signed copy');
-    const item = document.createElement('div');
-    item.className = 'history-document';
-    const words2 = document.createElement('div');
-    words2.className = 'history-document-words';
-    const name = document.createElement('span');
-    name.className = 'history-document-name';
-    name.textContent = (rec.files || [])[0] && rec.files[0].name || 'Signed time sheet';
-    words2.appendChild(name);
-    const meta = document.createElement('span');
-    meta.className = 'history-document-meta';
-    meta.textContent = [rec.invoice_no || '',
-      rec.created_at ? 'sent ' + new Date(rec.created_at).toLocaleDateString() : '']
-      .filter(Boolean).join(' · ');
-    words2.appendChild(meta);
-    item.appendChild(words2);
-
-    const acts = document.createElement('div');
-    acts.className = 'history-document-actions';
+    copy.setAttribute('data-label', 'Documents');
     const label = `${rec.consultant || ''} — ${when.textContent}`;
-    const view = iconButton('view', 'View the signed copy for ' + label,
-      'ghost small history-icon', () => viewStored(rec, when.textContent));
-    const viewLabel = document.createElement('span');
-    viewLabel.textContent = 'View';
-    view.appendChild(viewLabel);
-    acts.appendChild(view);
-    const download = iconButton('download', 'Download the signed copy for ' + label,
-      'ghost small history-icon', control => saveStored(rec, control));
-    const downloadLabel = document.createElement('span');
-    downloadLabel.textContent = 'Download';
-    download.appendChild(downloadLabel);
-    acts.appendChild(download);
-    /* The month itself, rather than the one document this row is about. */
-    const whole = iconButton('download', 'Download all three documents for ' + label + ' as one zip',
-      'ghost small history-icon', control => downloadMonthZip(rec, control));
-    const wholeLabel = document.createElement('span');
-    wholeLabel.textContent = 'Month zip';
-    whole.appendChild(wholeLabel);
-    acts.appendChild(whole);
-    item.appendChild(acts);
-    copy.appendChild(item);
+    const sent = rec.created_at ? 'sent ' + new Date(rec.created_at).toLocaleDateString() : '';
+
+    // the signed time sheet: the record this row was drawn from
+    copy.appendChild(filedDocument('Time sheet',
+      ['signed copy', rec.invoice_no || '', sent].filter(Boolean).join(' · '),
+      [filedAction('view', 'View', 'View the signed time sheet for ' + label,
+                   () => viewStored(rec, when.textContent)),
+       filedAction('download', 'Download', 'Download the signed time sheet for ' + label,
+                   control => saveStored(rec, control))],
+      (rec.files || [])[0] && rec.files[0].name));
+
+    // the invoice: approved in the app, nothing was scanned
+    const inv = monthSubmission(rec, 'invoice');
+    copy.appendChild(inv && inv.status === 'complete'
+      ? filedDocument('Invoice', ['approved invoice', inv.invoice_no || ''].filter(Boolean).join(' · '),
+          [filedAction('view', 'View', 'View the invoice for ' + label,
+                       () => reviewSubmission(inv.id)),
+           filedAction('download', 'Download', 'Download the invoice for ' + label,
+                       control => downloadForSigning(inv, control, 'invoice'))])
+      : filedDocument('Invoice', inv ? 'not approved yet' : 'not submitted', [], '', true));
+
+    // the payment advice: its signed copy, when one was filed
+    const adv = typeof archiveFor === 'function'
+      ? archiveFor(rec.consultant, rec.period_year, Number(rec.period_month) - 1, 'advice') : null;
+    copy.appendChild(adv
+      ? filedDocument('Payment Advice',
+          ['signed copy', adv.created_at ? 'sent ' + new Date(adv.created_at).toLocaleDateString() : '']
+            .filter(Boolean).join(' · '),
+          [filedAction('view', 'View', 'View the signed payment advice for ' + label,
+                       () => viewStored(adv, when.textContent)),
+           filedAction('download', 'Download', 'Download the signed payment advice for ' + label,
+                       control => saveStored(adv, control))],
+          (adv.files || [])[0] && adv.files[0].name)
+      : filedDocument('Payment Advice', 'signed copy not filed yet', [], '', true));
+
+    /* The month itself, rather than any one document in it. */
+    const whole = filedAction('download', 'Month zip',
+      'Download all three documents for ' + label + ' as one zip',
+      control => downloadMonthZip(rec, control));
+    const wholeRow = document.createElement('div');
+    wholeRow.className = 'history-document-actions filedmonthzip';
+    wholeRow.appendChild(whole);
+    copy.appendChild(wholeRow);
     row.appendChild(copy);
 
     body.appendChild(row);

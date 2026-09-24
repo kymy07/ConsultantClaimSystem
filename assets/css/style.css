@@ -1442,6 +1442,9 @@ textarea:focus{outline:2px solid #bcd6ea;border-color:var(--navy-soft)}
 .history-table tbody tr:hover{background:#fafcfd}
 .history-document{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
 .history-document+.history-document{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+/* a document of the month that is not on file yet: said, and quieter */
+.filed-missing .history-document-name{color:var(--muted)}
+.filedmonthzip{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
 /* the name of the file, then the reference under it */
 .history-document-words{display:block;max-width:100%;min-width:0}
 .history-document-name{
