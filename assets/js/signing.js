@@ -1028,6 +1028,23 @@ async function uploadNow (key, file, inp, hint) {
   const job = heldJobs().filter(j => j.key === key)[0];
   if (!job) { attached.delete(key); inp.value = ''; return; }
 
+  /* A signed advice is one page and a signed time sheet one or two. A file
+     far longer than that is a pack — the advice with the invoice, the sheet
+     and the agreement behind it — and once filed it is what everybody opens
+     as "the payment advice". Asked about before it goes, not found after. */
+  const kind = job.standIn ? 'advice' : kindOf(job.sub);
+  const most = SIGNED_PAGES[kind];
+  const pages = most ? await pdfPages(file) : null;
+  if (pages && pages > most && !confirm(
+    `${file.name} has ${pages} pages.\n\n` +
+    `A signed ${kindLabel(kind).toLowerCase()} is ${most === 1 ? 'one page' : 'at most ' + most + ' pages'}, ` +
+    'so this looks like a whole pack of documents rather than the signed copy.\n\n' +
+    'Upload it anyway?')) {
+    attached.delete(key);
+    inp.value = '';
+    return;
+  }
+
   signingBusy = true;
   inp.disabled = true;
   inp.setAttribute('aria-busy', 'true');
@@ -1043,6 +1060,24 @@ async function uploadNow (key, file, inp, hint) {
     signingBusy = false;
   }
   await renderSignUpload();
+}
+
+/* The most pages a signed copy of each document should have. */
+const SIGNED_PAGES = { advice: 1, claim: 2 };
+
+/** how many pages a PDF has — null for an image, or one that cannot be read */
+async function pdfPages (file) {
+  const isPdf = /pdf/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
+  if (!isPdf || typeof pdfReady !== 'function') return null;
+  try {
+    await pdfReady();
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const n = doc.numPages;
+    if (doc.destroy) doc.destroy();
+    return n;
+  } catch (err) {
+    return null;                          // unreadable here is not a reason to refuse it
+  }
 }
 
 /** the signed copy on the record, drawn as done */

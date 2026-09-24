@@ -456,11 +456,19 @@ check('the copy already on file can be read too',
 check('a copy is filed the moment it is chosen, and the months stay open',
   /host\.appendChild\(submitBar\(waiting\)\)/.test(signingjs) &&
   /uploadNow\(key, picked, inp, hint\);/.test(signingjs) &&
-  /async function uploadNow[\s\S]{0,700}await fileSignedCopy\(job,/.test(signingjs) &&
+  /async function uploadNow[\s\S]{0,2200}await fileSignedCopy\(job,/.test(signingjs) &&
   !/button\('Save', 'ghost'/.test(signingjs) && !/function saveSigned/.test(signingjs) &&
   /: filed \? 'Done'/.test(signingjs) &&
   /async function fileSignedCopy[\s\S]{0,1400}await Sync\.store\(/.test(signingjs) &&
   (signingjs.match(/Sync\.act\(sub\.id, 'approve'/g) || []).length === 1, true);
+/* Adlishah's September advice went up as a sixteen-page pack — the advice,
+   the invoice, the sheet, the agreement — and was then what everybody opened
+   as the payment advice. The page count is checked before it goes. */
+check('a signed copy far longer than the document is questioned before upload',
+  /const SIGNED_PAGES = \{ advice: 1, claim: 2 \};/.test(signingjs) &&
+  /async function pdfPages \(file\)/.test(signingjs) &&
+  /if \(pages && pages > most && !confirm\(/.test(signingjs) &&
+  /looks like a whole pack of documents/.test(signingjs), true);
 /* A filed copy can be taken off the record from History — by whoever filed it,
    or the administrator, which is exactly what BDOS allows. The approved
    invoice is the document itself, not a filed file, so it has no Remove. */
