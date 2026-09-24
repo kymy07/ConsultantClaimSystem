@@ -469,6 +469,11 @@ check('a signed copy far longer than the document is questioned before upload',
   /async function pdfPages \(file\)/.test(signingjs) &&
   /if \(pages && pages > most && !confirm\(/.test(signingjs) &&
   /looks like a whole pack of documents/.test(signingjs), true);
+/* Once a document is complete, the Status table's View opens the signed copy
+   that came back — the newest uploaded — not the form it started as. */
+check('a finished document is viewed as its signed copy on file',
+  /const filed = sub\.status === 'complete' && typeof archiveFor === 'function'/.test(approvals) &&
+  /\? openHistoryFile\(filed, 0, 'view', read\)\s*: reviewSubmission\(sub\.id\)/.test(approvals), true);
 /* A filed copy can be taken off the record from History — by whoever filed it,
    or the administrator, which is exactly what BDOS allows. The approved
    invoice is the document itself, not a filed file, so it has no Remove. */

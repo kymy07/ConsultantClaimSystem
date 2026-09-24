@@ -562,8 +562,19 @@ function statusRow (name, kind, sub, first) {
   acts.className = 'statusacts';
   acts.dataset.col = '';
   if (sub) {
-    const read = button('View', 'ghost small', () => reviewSubmission(sub.id));
-    read.setAttribute('aria-label', `View ${kindLabel(kind)} for ${name}, ${periodOf(sub)}`);
+    /* A finished document is the paper that came back, not the form it
+       started as. So once it is complete and its signed copy is on file,
+       View opens that copy — the newest one uploaded — which is the document
+       anybody asking about a closed month means. Until then it draws the
+       form, which is all there is. */
+    const filed = sub.status === 'complete' && typeof archiveFor === 'function'
+      ? archiveFor(name, statusMonth.y, statusMonth.m, kind) : null;
+    const read = button('View', 'ghost small', () => filed
+      ? openHistoryFile(filed, 0, 'view', read)
+      : reviewSubmission(sub.id));
+    read.setAttribute('aria-label', `View ${kindLabel(kind)} for ${name}, ${periodOf(sub)}` +
+      (filed ? ' — the signed copy on file' : ''));
+    if (filed) read.title = 'The signed copy on file' + (filedBy ? ', uploaded back by ' + filedBy : '');
     acts.appendChild(read);
     if (waitingOnMe(sub)) {
       const verb = sub.status === 'pending_signature' ? 'Sign' : 'Approve';
