@@ -1725,3 +1725,8 @@ input[type=file]::file-selector-button{font:inherit;border:1px solid #b4c4d1;bor
   .auth-card h1{font-size:26px}
   .foot-inner{padding:20px 0}
 }
+
+/* The month's zip is the month's, not one more document's, so it does not
+   wear the same white as the View and Download beside every file above it. */
+.history-icon.monthzip{background:var(--navy);color:#fff;border-color:var(--navy)}
+.history-icon.monthzip:hover{background:var(--navy-deep);border-color:var(--navy-deep);color:#fff}

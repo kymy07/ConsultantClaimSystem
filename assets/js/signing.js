@@ -1669,6 +1669,8 @@ function filedTable (pairs) {
     const whole = filedAction('download', 'Month zip',
       'Download all three documents for ' + label + ' as one zip',
       control => downloadMonthZip(rec, control));
+    // the month's own button, not one more document's: set apart in colour
+    whole.classList.add('monthzip');
     const wholeRow = document.createElement('div');
     wholeRow.className = 'history-document-actions filedmonthzip';
     wholeRow.appendChild(whole);
