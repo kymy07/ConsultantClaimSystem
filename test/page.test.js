@@ -1029,7 +1029,7 @@ check('a consultant can read their own history, and only read it',
   /reads: true/.test(appjs) &&
   /\(!s\.records \|\| Auth\.keepsRecords\(\) \|\| \(s\.reads && Auth\.prepares\(\)\)\)/.test(appjs) &&
   /const sends = typeof Auth !== 'undefined' && \(Auth\.keepsRecords\(\) \|\| Auth\.places\(\)\);/.test(archivejs) &&
-  /if \(sends\) wrap\.appendChild\(bar\);/.test(archivejs) &&
+  /if \(sends && records\.some\(r => r\.kind !== BANK_KIND\)\) wrap\.appendChild\(bar\);/.test(archivejs) &&
   /Nobody else can be seen here/.test(archivejs), true);
 check('a duplicate is pointed out to everybody, and the slip is the one without the person',
   /function duplicateCase/.test(signingjs) &&
@@ -1082,15 +1082,16 @@ check('a bank statement is filed as its own kind, behind the redaction reminder'
    September — had no line to put a statement on. Every month from August
    2026 to a year on is listed with its statement or the way to add it; a
    month not started yet is listed but not open. */
-check('bank statements are listed month by month from August 2026',
+check('every month from August 2026 is a table of its own in History',
   /rows\.concat\(statements\)\.forEach/.test(archivejs) &&
   /\.filter\(r => r\.kind === BANK_KIND\)/.test(archivejs) &&
   /const BANK_FIRST = \{ y: 2026, m: 8 \};/.test(archivejs) &&
   /const last = Math\.max\(first \+ BANK_SPAN, here\);/.test(archivejs) &&
-  /function bankYear \(\) \{\s*if \(!mayFileBank\(\)\) return null;/.test(archivejs) &&
-  /row\.appendChild\(bankCell\(name, when\)\)/.test(archivejs) &&
-  /Opens in \$\{m\.textContent\}/.test(archivejs) &&
-  !/function bankOtherMonth/.test(archivejs), true);
+  /listed\.forEach\(w => months\.set\(keyOf\(w\), \{ when: w, records: \[\] \}\)\)/.test(archivejs) &&
+  /historyTable\(m\.records, roster, m\.when\)/.test(archivejs) &&
+  /const first = records\[0\] \|\| forMonth;/.test(archivejs) &&
+  /Opens in \$\{MONTHS\[Number\(when\.period_month\) - 1\]\}/.test(archivejs) &&
+  !/function bankYear/.test(archivejs) && !/function bankOtherMonth/.test(archivejs), true);
 /* History recorded a month as its signed time sheet alone, so a month that
    went to Finance as three documents read here as one. Each of the three is
    on the row now, with its own View and Download, and the month one zip. */
