@@ -352,8 +352,30 @@ function paintHistory () {
   [...months.keys()].sort()
     .forEach(key => {
       const m = months.get(key);
-      host.appendChild(historyTable(m.records, roster, m.when));
+      const who = rosterFor(key, roster);
+      // a month nobody on this page has anything in, or is owed anything for
+      if (!who.length && !m.records.length) return;
+      host.appendChild(historyTable(m.records, who, m.when));
     });
+}
+
+/* A month before these claims began is somebody's only by exception. In
+   August 2026 one person was paid and owes a statement for it; nobody else
+   has anything for that month, and a line each saying so was a table of
+   nothing. So such a month lists only the people named for it — anybody who
+   has actually filed something there still appears, from their records. */
+const BANK_EARLY = { '2026-08': ['Adlishah Hakimi Sharilfuddin'] };
+
+/** a name as it is compared: the card and the form spell it differently */
+const nameKey = n => String(n || '').toLowerCase()
+  .replace(/\b(bin|binti|bte|bt)\b/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** who a month's table lists: everybody, or for an early month only those named */
+function rosterFor (key, roster) {
+  const only = BANK_EARLY[key];
+  if (!only) return roster;
+  const want = new Set(only.map(nameKey));
+  return roster.filter(n => want.has(nameKey(n)));
 }
 
 /* The first month a statement is asked for, and how far ahead the list runs.

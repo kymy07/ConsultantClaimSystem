@@ -109,6 +109,13 @@ adminNow = false;
  const file = panel.children.find(c => c.type === 'file');
  assert.equal(file.disabled, true);
  adminNow = false; roleNow = '';
+ /* August 2026 is before these claims began: it lists Adlishah alone, under
+    either spelling of his name, and every other month lists everybody. */
+ const all = ['Adlishah Hakimi bin Sharilfuddin', 'Anir Syazwan bin Sharbirin', 'Nur Afifah binti Zamzari'];
+ assert.equal(ctx.rosterFor('2026-08', all).join('|'), 'Adlishah Hakimi bin Sharilfuddin');
+ assert.equal(ctx.rosterFor('2026-08', ['Adlishah Hakimi Sharilfuddin']).length, 1);
+ assert.equal(ctx.rosterFor('2026-08', ['Anir Syazwan bin Sharbirin']).length, 0);
+ assert.equal(ctx.rosterFor('2026-09', all).length, 3);
  console.log('History grouping, missing documents, preview, download and error recovery passed.');
  console.log('Bank statements: kept apart from the signed copies, newest wins, offered to the consultant and the administrator only.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

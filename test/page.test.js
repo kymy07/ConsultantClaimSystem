@@ -1095,6 +1095,12 @@ check('a bank statement is filed as its own kind, behind the redaction reminder'
    September — had no line to put a statement on. Every month from August
    2026 to a year on is listed with its statement or the way to add it; a
    month not started yet is listed but not open. */
+/* August 2026 is before these claims began, and only Adlishah owes a
+   statement for it; a month nobody is listed in is not drawn at all. */
+check('an early month lists only the people named for it',
+  /const BANK_EARLY = \{ '2026-08': \['Adlishah Hakimi Sharilfuddin'\] \};/.test(archivejs) &&
+  /const who = rosterFor\(key, roster\);/.test(archivejs) &&
+  /if \(!who\.length && !m\.records\.length\) return;/.test(archivejs), true);
 /* With a year of months on the page, the one running now is picked out. */
 check('History picks out the month running now',
   /wrap\.classList\.add\('history-current'\)/.test(archivejs) &&
@@ -1107,7 +1113,7 @@ check('every month from August 2026 is a table of its own in History',
   /const BANK_FIRST = \{ y: 2026, m: 8 \};/.test(archivejs) &&
   /const last = Math\.max\(first \+ BANK_SPAN, here\);/.test(archivejs) &&
   /listed\.forEach\(w => months\.set\(keyOf\(w\), \{ when: w, records: \[\] \}\)\)/.test(archivejs) &&
-  /historyTable\(m\.records, roster, m\.when\)/.test(archivejs) &&
+  /historyTable\(m\.records, who, m\.when\)/.test(archivejs) &&
   /const first = records\[0\] \|\| forMonth;/.test(archivejs) &&
   /Opens in \$\{MONTHS\[Number\(when\.period_month\) - 1\]\}/.test(archivejs) &&
   !/function bankYear/.test(archivejs) && !/function bankOtherMonth/.test(archivejs), true);
