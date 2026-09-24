@@ -259,6 +259,12 @@ read endpoints, the list included. The list is the one that matters: it delibera
 `data`, and a table of "whose September invoice is where" cannot be drawn from rows that do not
 say which document they are.
 
+**Who may send which `kind`.** A `"claim"` or an `"invoice"` is sent by a `consultant` or the `admin`.
+An `"advice"` is sent by the `pa` or the `admin`, and by no consultant: it is the office's own form,
+written by the PA once the HOD has approved the invoice it pays — including when the PA files the
+signed copy of an advice nobody had opened, which writes it at that moment. `403` otherwise. The
+`history` entry names the role that actually sent it.
+
 `TEXT NOT NULL DEFAULT 'claim'`, added by an idempotent `ALTER` on boot: every row written before
 a month was two documents was the whole claim, and the time sheet is the half that carries the
 signatures. CCS also writes it inside `data.submitKind` and falls back to reading it from there,
