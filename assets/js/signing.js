@@ -1693,14 +1693,21 @@ function filedTable (pairs) {
           (bank.files || [])[0] && bank.files[0].name)
       : filedDocument('Bank Statement', 'not uploaded by the consultant yet', [], '', true));
 
-    /* The month itself, rather than any one document in it. */
+    /* The month itself, rather than any one document in it. It sat at the
+       foot of the documents and read as one more of them, so it lives with
+       the person instead — under their name, labelled as the whole month —
+       well away from the View and Download beside each file. */
     const whole = filedAction('download', 'Month zip',
       'Download all three documents for ' + label + ' as one zip',
       control => downloadMonthZip(rec, control));
     // the month's own button, not one more document's: set apart in colour
     whole.classList.add('monthzip');
     const wholeRow = document.createElement('div');
-    wholeRow.className = 'history-document-actions filedmonthzip';
+    wholeRow.className = 'filedmonth';
+    const wholeLabel = document.createElement('span');
+    wholeLabel.className = 'filedmonth-label';
+    wholeLabel.textContent = 'Whole month';
+    wholeRow.appendChild(wholeLabel);
     wholeRow.appendChild(whole);
     /* A closed month can be opened again, to add a copy or put one right.
        Offered only while something in it is closed — once it is open, the
@@ -1711,7 +1718,7 @@ function filedTable (pairs) {
         control => reopenMonth(rec, control));
       wholeRow.appendChild(again);
     }
-    copy.appendChild(wholeRow);
+    who.appendChild(wholeRow);
     row.appendChild(copy);
 
     body.appendChild(row);
