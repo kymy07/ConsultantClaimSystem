@@ -231,7 +231,8 @@ async function renderHistory (force) {
     lead.textContent = collecting
       ? 'Filter signed documents, then view or download them as one ZIP.'
       : mine
-        ? 'Your own signed documents, by year. Nobody else can be seen here, and nothing here can be changed.'
+        ? 'Your own signed documents, by year. Nobody else can be seen here. ' +
+          'Add your bank statement for each paid month — black out your balance and other transactions first.'
         : 'Find signed documents by consultant and year.';
   }
 
@@ -377,6 +378,189 @@ function collectorRoster () {
    buttons. Three kinds now, and spelling them inline meant an expression
    that could only tell two apart. */
 const HISTORY_COLUMN = { claim: 'Time sheet', invoice: 'Invoice', advice: 'Payment Advice' };
+
+/* -------------------------------------------------------------------
+   Bank statements
+
+   The consultant's own proof that a month was paid, put beside the three
+   documents that month went out as. It is not a signed copy and never
+   stands for one: it is filed as a kind of its own at a stage of its own,
+   so nothing that reads the signed copies — the zips, Finance, Re-Upload —
+   ever picks it up.
+
+   A statement carries far more than this needs: a balance, every other
+   payment in and out, an account number. So the page asks for those to be
+   blacked out before a file can even be chosen, because once it is here
+   everybody who keeps the records can open it.
+   ------------------------------------------------------------------- */
+const BANK_KIND = 'bank';
+
+/** the statement on file for one person and month: the newest, if there are two */
+function bankFor (name, year, month) {
+  const who = String(name || '').trim();
+  return archive.filter(r => r.kind === BANK_KIND &&
+    String(r.consultant || '').trim() === who &&
+    Number(r.period_year) === Number(year) &&
+    Number(r.period_month) === Number(month)).sort(newestFirst)[0] || null;
+}
+
+/**
+ * May this account file one? Whoever prepares claims: a consultant files
+ * their own — their History holds nobody else's — and the administrator,
+ * who prepares claims too, files for anybody. Asked as what the account
+ * does, not what it is called. BDOS holds the same rule, so this only
+ * decides what the page offers.
+ */
+const mayFileBank = () => typeof Auth !== 'undefined' && Auth.prepares();
+
+function bankCell (name, when) {
+  const cell = document.createElement('td');
+  cell.setAttribute('data-label', 'Bank Statement');
+  const rec = bankFor(name, when.period_year, when.period_month);
+
+  if (rec) {
+    const f = (rec.files || [])[0] || {};
+    const item = document.createElement('div');
+    item.className = 'history-document';
+    const words = document.createElement('div');
+    words.className = 'history-document-words';
+    const title = document.createElement('span');
+    title.className = 'history-document-name';
+    title.textContent = 'Bank statement';
+    words.appendChild(title);
+    const meta = document.createElement('span');
+    meta.className = 'history-document-meta';
+    meta.textContent = [rec.created_by ? 'by ' + rec.created_by : '',
+      rec.created_at ? new Date(rec.created_at).toLocaleDateString() : ''].filter(Boolean).join(' \u00B7 ');
+    words.appendChild(meta);
+    words.title = f.name || '';
+    item.appendChild(words);
+
+    const actions = document.createElement('div');
+    actions.className = 'history-document-actions';
+    ['view', 'download'].forEach(action => {
+      const control = iconButton(action,
+        (action === 'view' ? 'View the bank statement \u2014 ' : 'Download the bank statement \u2014 ') + name,
+        'ghost small history-icon', c => openHistoryFile(rec, 0, action, c));
+      const text = document.createElement('span');
+      text.textContent = action === 'view' ? 'View' : 'Download';
+      control.appendChild(text);
+      actions.appendChild(control);
+    });
+    item.appendChild(actions);
+    cell.appendChild(item);
+  } else if (!mayFileBank()) {
+    const empty = document.createElement('span');
+    empty.className = 'history-missing';
+    empty.textContent = 'Not uploaded';
+    cell.appendChild(empty);
+  }
+
+  if (mayFileBank()) cell.appendChild(bankUploader(name, when, !!rec));
+  return cell;
+}
+
+/**
+ * The way a statement gets here: a button, and behind it the reminder, a box
+ * to tick, and only then the file. The file box stays closed until the box
+ * is ticked, so the reminder is read at the one moment it can still help.
+ */
+function bankUploader (name, when, replacing) {
+  const box = document.createElement('div');
+  box.className = 'bankupload';
+  const month = `${MONTHS[Math.max(0, Number(when.period_month) - 1)]} ${when.period_year}`;
+
+  const open = button(replacing ? 'Replace statement' : 'Upload bank statement', 'ghost small', () => {
+    panel.hidden = false;
+    open.hidden = true;
+    tick.focus();
+  });
+  box.appendChild(open);
+
+  const panel = document.createElement('div');
+  panel.className = 'bankpanel';
+  panel.hidden = true;
+
+  const warn = document.createElement('p');
+  warn.className = 'bankwarn';
+  warn.textContent = `Before you upload: black out your balance, every other transaction and ` +
+    `your account number (the last four digits may stay). Leave only your name, the date and ` +
+    `the payment for ${month}. The administrator and the PA can open this file.`;
+  panel.appendChild(warn);
+
+  const agree = document.createElement('label');
+  agree.className = 'bankagree';
+  const tick = document.createElement('input');
+  tick.type = 'checkbox';
+  agree.appendChild(tick);
+  agree.appendChild(document.createTextNode(
+    ' I have blacked out my balance, my other transactions and my account number.'));
+  panel.appendChild(agree);
+
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.disabled = true;
+  inp.accept = '.pdf,.png,.jpg,.jpeg,image/*,application/pdf';
+  inp.setAttribute('aria-label', `Bank statement for ${name}, ${month}`);
+  tick.addEventListener('change', () => { inp.disabled = !tick.checked; });
+  inp.addEventListener('change', () => {
+    const picked = inp.files && inp.files[0];
+    if (picked) uploadBankStatement(name, when, picked, inp);
+  });
+  panel.appendChild(inp);
+
+  const hint = document.createElement('small');
+  hint.className = 'signhint';
+  hint.textContent = 'One file, PDF or image, up to 12 MB.' +
+    (replacing ? ' It replaces the statement already here.' : '');
+  panel.appendChild(hint);
+
+  const cancel = button('Cancel', 'ghost small', () => {
+    panel.hidden = true;
+    open.hidden = false;
+    tick.checked = false;
+    inp.disabled = true;
+    inp.value = '';
+  });
+  panel.appendChild(cancel);
+
+  box.appendChild(panel);
+  return box;
+}
+
+async function uploadBankStatement (name, when, file, control) {
+  if (file.size > ARCHIVE_MAX_BYTES) {
+    toast(file.name + ' is over the ' + Math.round(ARCHIVE_MAX_BYTES / 1048576) + ' MB limit.', true);
+    control.value = '';
+    return;
+  }
+  control.disabled = true;
+  control.setAttribute('aria-busy', 'true');
+  try {
+    const payload = await Sync.readFile(file);
+    payload.name = 'Bank statement \u2014 ' + payload.name;
+    const rec = await Sync.storeBank(name, when.period_year, when.period_month, payload);
+    /* A BDOS that does not know this kind yet stores it with none, and a
+       record with no kind is read everywhere as every document of the month
+       at once — somebody's bank statement would stand in for their signed
+       time sheet. So anything that did not come back as a statement is taken
+       straight off the record, and nothing is kept. */
+    if (!rec || rec.kind !== BANK_KIND) {
+      if (rec && rec.id) { try { await Sync.unstore(rec.id); } catch (e) { /* nothing more to do */ } }
+      throw new Error('The server is not ready for bank statements yet, so nothing was kept. ' +
+                      'Please try again later.');
+    }
+    toast('Bank statement uploaded.');
+    await renderHistory(true);
+  } catch (err) {
+    toast(err.status === 403
+      ? 'Only the consultant, or the administrator, can upload this bank statement.'
+      : (err.message || 'Could not upload the bank statement.'), true);
+    control.disabled = false;
+    control.removeAttribute('aria-busy');
+    control.value = '';
+  }
+}
 const HISTORY_WHAT = { claim: 'time sheet', invoice: 'invoice', advice: 'payment advice' };
 
 function historyTable (records, roster) {
@@ -416,7 +600,7 @@ function historyTable (records, roster) {
   if (sends) wrap.appendChild(bar);
   const head = document.createElement('thead');
   const titles = document.createElement('tr');
-  ['Consultant', 'Time Sheet', 'Invoice', 'Payment Advice'].forEach(label => {
+  ['Consultant', 'Time Sheet', 'Invoice', 'Payment Advice', 'Bank Statement'].forEach(label => {
     const cell = document.createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
@@ -513,7 +697,7 @@ function historyTable (records, roster) {
       }
       row.appendChild(cell);
     });
-
+    row.appendChild(bankCell(name, when));
 
     body.appendChild(row);
   });

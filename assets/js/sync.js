@@ -326,6 +326,32 @@ async function storeSigned (S, files, note, kind, stage) {
 }
 
 /**
+ * File a consultant's bank statement for one month.
+ *
+ * Not a signed copy, so not storeSigned(): that one keeps to the three
+ * documents that travel for approval and sends anything else with no kind,
+ * and a record with no kind is read everywhere as every document at once.
+ * A statement goes up as its own kind at its own stage, which BDOS keeps
+ * apart from the signed copies — and a new one replaces the one before.
+ */
+async function storeBankStatement (consultant, year, month, file) {
+  if (!syncOn) throw new Error('The shared database is not reachable, so there is nowhere to file it.');
+  const body = await ccsFetch('/archive', {
+    method: 'POST',
+    body: JSON.stringify({
+      consultant:   String(consultant || '').trim(),
+      period_month: Number(month) || null,
+      period_year:  Number(year) || null,
+      kind:         'bank',
+      stage:        'statement',
+      note:         'Bank statement',
+      files:        [file]
+    })
+  });
+  return (body && body.record) || null;
+}
+
+/**
  * What has been filed. Both filters are optional: no consultant means
  * everybody, no year means every year.
  *
@@ -642,6 +668,7 @@ const Sync = {
   history: claimHistory,
   readFile: readFileForUpload,
   store: storeSigned,
+  storeBank: storeBankStatement,
   stored: storedClaims,
   storedOne: storedClaim,
   unstore: unstoreSigned,

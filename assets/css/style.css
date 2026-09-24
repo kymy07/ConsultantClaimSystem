@@ -1445,6 +1445,14 @@ textarea:focus{outline:2px solid #bcd6ea;border-color:var(--navy-soft)}
 /* a document of the month that is not on file yet: said, and quieter */
 .filed-missing .history-document-name{color:var(--muted)}
 .filedmonthzip{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+/* a bank statement: the reminder, the box to tick, then the file */
+.bankupload{margin-top:10px}
+.bankpanel{display:flex;flex-direction:column;align-items:flex-start;gap:8px;
+  padding:10px 12px;border:1px solid #f0c9a8;border-radius:10px;background:var(--orange-soft)}
+.bankwarn{margin:0;font-size:12.5px;line-height:1.45;color:#7a3413}
+.bankagree{display:flex;gap:6px;align-items:flex-start;font-size:12.5px;font-weight:600}
+.bankagree input{margin-top:2px}
+.bankpanel input[type=file]{font-size:12.5px;max-width:100%}
 /* the name of the file, then the reference under it */
 .history-document-words{display:block;max-width:100%;min-width:0}
 .history-document-name{

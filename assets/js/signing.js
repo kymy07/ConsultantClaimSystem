@@ -1533,6 +1533,20 @@ function filedTable (pairs) {
           (adv.files || [])[0] && adv.files[0].name)
       : filedDocument('Payment Advice', 'signed copy not filed yet', [], '', true));
 
+    // the consultant's bank statement, when they have put one up
+    const bank = typeof bankFor === 'function'
+      ? bankFor(rec.consultant, rec.period_year, rec.period_month) : null;
+    copy.appendChild(bank
+      ? filedDocument('Bank Statement',
+          ['uploaded by ' + (bank.created_by || 'the consultant'),
+           bank.created_at ? new Date(bank.created_at).toLocaleDateString() : ''].filter(Boolean).join(' \u00b7 '),
+          [filedAction('view', 'View', 'View the bank statement for ' + label,
+                       () => viewStored(bank, when.textContent)),
+           filedAction('download', 'Download', 'Download the bank statement for ' + label,
+                       control => saveStored(bank, control))],
+          (bank.files || [])[0] && bank.files[0].name)
+      : filedDocument('Bank Statement', 'not uploaded by the consultant yet', [], '', true));
+
     /* The month itself, rather than any one document in it. */
     const whole = filedAction('download', 'Month zip',
       'Download all three documents for ' + label + ' as one zip',

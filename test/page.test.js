@@ -1030,6 +1030,20 @@ check('uploading again replaces the file, and the page says so',
   /a new upload replaces it when saved/.test(signingjs) &&
   /const before = copiesOnFile\(sub, kind\);[\s\S]{0,300}await dropSuperseded\(before, kept\);/
     .test(signingjs), true);
+/* A consultant files their bank statement for a paid month in History. It is
+   a kind of its own at a stage of its own, so it never stands for a signed
+   copy; the file box stays shut until the blacking-out is confirmed; and a
+   server that stored it as anything else has it taken straight back. */
+check('a bank statement is filed as its own kind, behind the redaction reminder',
+  /kind:\s+'bank',\s*stage:\s+'statement'/.test(syncjs) &&
+  /storeBank: storeBankStatement/.test(syncjs) &&
+  /inp\.disabled = true;[\s\S]{0,400}tick\.addEventListener\('change', \(\) => \{ inp\.disabled = !tick\.checked; \}\)/
+    .test(archivejs) &&
+  /black out your balance, every other transaction/.test(archivejs) &&
+  /if \(!rec \|\| rec\.kind !== BANK_KIND\) \{[\s\S]{0,120}Sync\.unstore\(rec\.id\)/.test(archivejs) &&
+  /const mayFileBank = \(\) => typeof Auth !== 'undefined' && Auth\.prepares\(\);/.test(archivejs) &&
+  /'Bank Statement'\]\.forEach/.test(archivejs) &&
+  /filedDocument\('Bank Statement',/.test(signingjs), true);
 /* History recorded a month as its signed time sheet alone, so a month that
    went to Finance as three documents read here as one. Each of the three is
    on the row now, with its own View and Download, and the month one zip. */
