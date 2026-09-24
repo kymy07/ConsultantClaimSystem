@@ -170,6 +170,27 @@ function copiesMissing (rows) {
 }
 
 /**
+ * The person-months on the page with every copy in: a signed time sheet and a
+ * signed payment advice on the record (or on their way up). These are the
+ * months Submit can close.
+ *
+ * Both, not "whatever has a box": an advice with no box yet is one whose
+ * invoice the HOD has not approved, and closing the month before it exists
+ * would leave the advice with nowhere to be filed.
+ */
+function completeRows (rows) {
+  return rows.filter(r => ['claim', 'advice'].every(kind => {
+    const t = uploadTarget(r, kind);
+    if (t && attached.has(t.key)) return true;
+    return !!(typeof archiveFor === 'function' &&
+      archiveFor(r.consultant, r.period_year, Number(r.period_month) - 1, kind));
+  }));
+}
+
+/** was this document ever taken back after it was closed? */
+const wasReopened = sub => (sub.history || []).some(h => h.action === 'reopen');
+
+/**
  * The documents on the page with a copy on the record and a month still open.
  *
  * These are what Submit closes beyond whatever is being filed in the same
@@ -1118,17 +1139,21 @@ async function dropSuperseded (before, kept) {
  * that is closed has been handed on.
  *
  * So each copy is filed the moment it is chosen (see uploadNow) and leaves
- * the months open, and Submit is offered only when nothing on the page is
- * still waiting for a copy. Until then there is nothing to decide: upload
- * what arrived, and come back.
+ * the months open, and Submit closes each month whose own copies are all in
+ * (see completeRows) — the rest stay open until theirs arrive.
  */
 function submitBar (rows) {
   const bar = document.createElement('div');
   bar.className = 'signsubmit';
 
   const missing = copiesMissing(rows);
-  const closing = closableSubs(rows).concat(heldJobs().map(j => j.sub));
-  const ready = !missing && closing.length > 0;
+  /* A month is closed when its own copies are all in, not when everybody
+     else's are too. Waiting for the whole page meant one person's missing
+     advice held every other month open — including one reopened to put a
+     single scan right, which could then not be closed again. */
+  const closing = closableSubs(completeRows(rows));
+  const ready = closing.length > 0;
+  const again = closing.some(wasReopened);
   /* Documents are what is filed; months are what is closed, and a person's
      month is two documents. Counting one and saying the other put "closes
      all 3 of these months" under two people's September. */
@@ -1138,21 +1163,28 @@ function submitBar (rows) {
   const said = document.createElement('p');
   said.className = 'signsaid';
   said.setAttribute('role', 'status');
-  said.textContent = missing
-    ? missing + ' document' + (missing === 1 ? '' : 's') + ' on this page still need' +
-      (missing === 1 ? 's' : '') + ' a signed copy. Each file is saved the moment you choose it; ' +
-      'the months are closed together when the last of them is in.'
-    : closing.length
-      ? 'Every signed copy is on the record. Submit closes ' + monthWords +
-        ' and files ' + (months === 1 ? 'it' : 'them') + ' in History.'
+  const waiting = missing
+    ? missing + ' document' + (missing === 1 ? '' : 's') + ' still waiting for a signed copy'
+    : '';
+  said.textContent = ready
+    ? (months === 1 ? 'One month has' : months + ' months have') + ' every signed copy in. ' +
+      (again ? 'Resubmit' : 'Submit') + ' closes ' + (months === 1 ? 'it' : 'them') +
+      ' and files ' + (months === 1 ? 'it' : 'them') + ' in History' +
+      (waiting ? '; ' + waiting + ' stay open.' : '.')
+    : waiting
+      ? waiting[0].toUpperCase() + waiting.slice(1) + '. Each file is saved the moment you ' +
+        'choose it; a month can be closed as soon as all of its own copies are in.'
       : 'Nothing here is waiting to be filed or closed.';
   bar.appendChild(said);
 
   const row = document.createElement('div');
   row.className = 'btnrow';
-  /* Green, and only when the whole page can go: the colour is the answer to
-     "is this ready?", which is the only question anybody asks of this button. */
-  const go = button('Submit and close the month', ready ? 'go' : '', () => submitSigned(go, rows));
+  /* Green when there is a month to close: the colour is the answer to "is
+     this ready?", which is the only question anybody asks of this button.
+     "Resubmit" when one of them was reopened, because that is what it is. */
+  const go = button((again ? 'Resubmit' : 'Submit') + ' and close the month' +
+                    (months > 1 ? 's (' + months + ')' : ''),
+                    ready ? 'go' : '', () => submitSigned(go, rows));
   go.disabled = !ready;
   row.appendChild(go);
   bar.appendChild(row);
@@ -1222,7 +1254,8 @@ async function fileSignedCopy (job, by) {
 async function submitSigned (go, rows) {
   if (signingBusy) return;
   const jobs = heldJobs();
-  const already = closableSubs(rows || uploadRows());
+  // only months with all of their own copies in; the rest stay open
+  const already = closableSubs(completeRows(rows || uploadRows()));
   const closing = [];
   const seen = new Set();
   const remember = sub => {

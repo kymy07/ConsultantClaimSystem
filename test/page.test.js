@@ -487,15 +487,21 @@ check('a closed month can be reopened from History, with a reason',
 /* And Submit is not offered until nothing on the page is still waiting for
    a copy — chosen or already filed, every document that can have one has
    one. Green is the answer to "is this ready?" before the words are read. */
-check('and Submit is offered, in green, only when none are missing',
-  /const ready = !missing && closing.length > 0/.test(signingjs) &&
-  /function copiesMissing[\s\S]{0,700}if \(attached\.has\(t\.key\)\) return/.test(signingjs) &&
-  /button\('Submit and close the month', ready \? 'go' : ''/.test(signingjs) &&
+/* A month closes when its own copies are in — the signed time sheet and the
+   signed payment advice — not when everybody else's are too. Waiting for
+   the whole page let one missing advice hold every month open, including one
+   reopened to put a single scan right. */
+check('Submit closes each month whose own copies are all in',
+  /function completeRows \(rows\) \{\s*return rows\.filter\(r => \['claim', 'advice'\]\.every\(/.test(signingjs) &&
+  /const closing = closableSubs\(completeRows\(rows\)\);\s*const ready = closing\.length > 0;/.test(signingjs) &&
   /go\.disabled = !ready/.test(signingjs) &&
   /\.btn\.go\{background:var\(--ok\)/.test(css), true);
+check('and says Resubmit for a month that was reopened',
+  /const wasReopened = sub => \(sub\.history \|\| \[\]\)\.some\(h => h\.action === 'reopen'\)/.test(signingjs) &&
+  /\(again \? 'Resubmit' : 'Submit'\) \+ ' and close the month'/.test(signingjs), true);
 check('and it closes the months saved on earlier days with them',
   /function closableSubs[\s\S]{0,460}if \(filed\) subs\.push\(t\.sub\)/.test(signingjs) &&
-  /const already = closableSubs\(rows \|\| uploadRows\(\)\)/.test(signingjs), true);
+  /const already = closableSubs\(completeRows\(rows \|\| uploadRows\(\)\)\)/.test(signingjs), true);
 /* The button says the name the office uses; the sentence above it says the
    whole name, for whoever does not know who that is. */
 /* A button that is a drawing must be drawn, not typed. Whichever font the
@@ -906,7 +912,7 @@ check('and it names what is going before it goes',
 /* Finance is where the e-mail goes, not a role in the app: no account, no
    approval stage. The month is closed here and mailed afterwards. */
 check('submitting closes the month rather than passing it on',
-  /'Submit and close the month'/.test(signingjs) &&
+  /\(again \? 'Resubmit' : 'Submit'\) \+ ' and close the month'/.test(signingjs) &&
   !/finance/.test(authjs) && !/pending_finance|'finance'/.test(signingjs), true);
 check('and it files the scan before it closes the month',
   /remember\(await fileSignedCopy\(jobs\[i\], by\)\)[\s\S]{0,420}if \(sub\.status === SIGNING_STATUS\) await Sync\.act\(sub\.id, 'approve'/

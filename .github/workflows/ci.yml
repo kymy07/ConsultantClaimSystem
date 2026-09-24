@@ -90,6 +90,9 @@ jobs:
       - name: Test a month that holds the same document twice
         run: node test/furthest-along.test.js
 
+      - name: Test which months Submit closes
+        run: node test/close-complete.test.js
+
       # Added with the screens they cover, but never run — a test nothing
       # runs is a comment that takes longer to write.
       - name: Test the archive Download all builds
