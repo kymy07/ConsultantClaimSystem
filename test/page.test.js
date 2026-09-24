@@ -1010,6 +1010,26 @@ check('and never on the strength of an empty cache',
 check('the note is on the PA’s tables and the Status table alike',
   /const dup = duplicateProfileNote\(name, \(\) => \{/.test(signingjs) &&
   /duplicateProfileNote\(name, \(\) => renderApprovals\(\)\)/.test(approvals), true);
+/* Re-Upload is the month's three documents. Two are scanned after the HOD
+   signs them on paper; the invoice finishes in the app and has nothing to
+   scan, so the approved one is simply there — and it never holds a month
+   open, because there is nothing it could be waiting for. */
+check('Re-Upload shows all three documents, the invoice added automatically',
+  /return \[uploadLine\(found, 'claim'\), invoiceUploadLine\(found\), uploadLine\(found, 'advice'\)\]/
+    .test(signingjs) &&
+  /function invoiceUploadLine \(row\)/.test(signingjs) &&
+  /'added automatically \\u2014 nothing to upload'/.test(signingjs) &&
+  /the approved invoice is added automatically/.test(html), true);
+check('and only the two scanned documents are counted as owed',
+  /function copiesOwed \(rows\) \{[\s\S]{0,120}\['claim', 'advice'\]\.forEach/.test(signingjs) &&
+  /function copiesMissing \(rows\) \{[\s\S]{0,120}\['claim', 'advice'\]\.forEach/.test(signingjs), true);
+/* One file a document: uploading again is how a wrong scan is put right,
+   and only the latest is kept. The page says so where the choice is made. */
+check('uploading again replaces the file, and the page says so',
+  /only the latest file is kept/.test(signingjs) &&
+  /a new upload replaces it when saved/.test(signingjs) &&
+  /const before = copiesOnFile\(sub, kind\);[\s\S]{0,300}await dropSuperseded\(before, kept\);/
+    .test(signingjs), true);
 /* The PA asked to read the invoice where she prints the other two: it is
    the bill the payment advice pays. Read whenever there is one, downloaded
    once the HOD has approved it, and drawn as an invoice, not as a sheet. */

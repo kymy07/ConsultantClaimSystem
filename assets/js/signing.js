@@ -786,11 +786,11 @@ async function renderSignUpload () {
     empty.textContent = 'All signed copies are filed. You can replace a scan below.';
     host.appendChild(empty);
   }
-  /* Two lines per person, the two the HOD signs on the Download page: the
-     signed time sheet and the signed payment advice, each against the month it
-     belongs to. Only the signed copies are asked for here — the unsigned
-     forms are on the Download page, and a column of them on this one was a
-     column nobody clicked. */
+  /* Three lines per person, one per document of the month. Two of them are
+     uploaded: the time sheet and the payment advice, which the HOD signs on
+     paper. The invoice is not — it finishes at the HOD in the app and has no
+     signature of his to scan, so the approved one is simply there, and the
+     line says so rather than leaving a gap in the month. */
   const byMonth = new Map();
   waiting.forEach(r => byMonth.set(`${r.consultant}|${r.period_year}|${r.period_month}`, r));
   signingMonthTables(host, waiting, ['Document', 'Status', 'Signed copy'], null, {
@@ -800,7 +800,7 @@ async function renderSignUpload () {
       const found = row || byMonth.get(`${name}|${month.y}|${month.m}`) ||
         { consultant: name, period_year: month.y, period_month: month.m,
           claim: null, advice: null };
-      return [uploadLine(found, 'claim'), uploadLine(found, 'advice')];
+      return [uploadLine(found, 'claim'), invoiceUploadLine(found), uploadLine(found, 'advice')];
     }
   });
 
@@ -841,6 +841,47 @@ function uploadLine (row, kind) {
   if (filed && !held) badge.classList.add('done');
 
   return [doc, badge, uploadSlot(row, kind, filed, target, held)];
+}
+
+/**
+ * The invoice's line: nothing to upload, because nothing is signed on paper.
+ *
+ * The approved invoice is the document. It is shown here so a month reads as
+ * the three documents it is, and so nobody goes looking for a box to put a
+ * scan of it in.
+ */
+function invoiceUploadLine (row) {
+  const inv = monthInvoice(row.consultant, Number(row.period_year), Number(row.period_month));
+  const who = `${row.consultant || 'consultant'}, ${periodOf(row)}`;
+
+  if (!inv) {
+    const none = signingDocument('Invoice', 'Not submitted yet', []);
+    none.classList.add('signdoc-quiet');
+    return [none, statusBadge('Not submitted'), emptyCell()];
+  }
+
+  const doc = signingDocument('Invoice', inv.invoice_no || '', []);
+  const cell = document.createElement('div');
+  cell.className = 'signcell';
+  const look = labelledIcon('view', 'View', `View the invoice for ${who}`,
+                            () => reviewSubmission(inv.id));
+
+  if (inv.status !== 'complete') {
+    doc.classList.add('signdoc-quiet');
+    const wait = signingDocument('Added automatically',
+      'once the HOD approves it \u2014 nothing to upload', [look]);
+    wait.classList.add('signonfile');
+    cell.appendChild(wait);
+    return [doc, statusBadge(invoiceLineWords(inv)), cell];
+  }
+
+  const auto = signingDocument('Approved invoice',
+    'added automatically \u2014 nothing to upload', [look]);
+  auto.classList.add('signonfile');
+  cell.appendChild(auto);
+  const badge = statusBadge('Automatic');
+  badge.classList.add('done');
+  return [doc, badge, cell];
 }
 
 /** where a document that cannot be uploaded yet has got to */
@@ -918,7 +959,11 @@ function uploadSlot (row, kind, filed, target, file) {
     pick.appendChild(inp);
     const hint = document.createElement('small');
     hint.className = 'signhint';
-    hint.textContent = (filed ? 'Replacement: ' : 'Signed copy: ') + 'PDF or image, up to 12 MB.';
+    /* One file a document. Choosing again is how a wrong scan is put right,
+       and the page says what happens to the one already there. */
+    hint.textContent = filed
+      ? 'Upload again to replace it \u2014 only the latest file is kept. PDF or image, up to 12 MB.'
+      : 'Signed copy: one file, PDF or image, up to 12 MB.';
     pick.appendChild(hint);
     cell.appendChild(pick);
   }
@@ -932,7 +977,7 @@ function onFileNote (filed, row, kind, replaceable) {
   const note = signingDocument('Copy on file',
     'uploaded by ' + (filed.created_by || 'somebody') +
     (filed.created_at ? ' on ' + new Date(filed.created_at).toLocaleDateString() : '') +
-    (replaceable ? ' \u00b7 replaced when you submit' : ''), [
+    (replaceable ? ' \u00b7 a new upload replaces it when saved' : ''), [
       labelledIcon('view', 'View', 'View the copy on file for ' + (row.consultant || ''),
                    () => viewFiled(filed, row))
     ]);
