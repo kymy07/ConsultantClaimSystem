@@ -870,6 +870,10 @@ body.locked > .sitefoot{display:none}
 .signpick input[type=file]{font-size:12.5px;max-width:100%}
 .signready-doc .history-document-name{color:var(--ok)}
 .signonfile{padding-top:10px;border-top:1px dashed var(--line)}
+/* a copy on the record reads as done, not as a box still waiting to be filled */
+.signfiled{background:#e7f5ee;border:1px solid #9ed3ba;border-radius:10px;padding:10px 12px}
+.signfiled .history-document-name{color:var(--ok);font-weight:700}
+.signcell > .btn.small{align-self:flex-start}
 /* where each person's time sheet has got, coloured by what it asks of the PA */
 .signstatus{
   display:inline-block;font-size:12px;font-weight:600;line-height:1.3;

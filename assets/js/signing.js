@@ -875,9 +875,9 @@ function invoiceUploadLine (row) {
     return [doc, statusBadge(invoiceLineWords(inv)), cell];
   }
 
-  const auto = signingDocument('Approved invoice',
+  const auto = signingDocument('\u2713 Approved invoice',
     'added automatically \u2014 nothing to upload', [look]);
-  auto.classList.add('signonfile');
+  auto.classList.add('signfiled');
   cell.appendChild(auto);
   const badge = statusBadge('Automatic');
   badge.classList.add('done');
@@ -938,6 +938,13 @@ function uploadSlot (row, kind, filed, target, file) {
     ready.classList.add('signready-doc');
     cell.appendChild(ready);
   } else {
+    /* A copy already on the record is the answer, so it comes first and it
+       looks finished. The box to choose a file was on top of it, and a cell
+       that opens with "Choose File" reads as a job not done — however green
+       the badge beside it. Replacing a wrong scan is still one click away,
+       behind a button that says that is what it is for. */
+    if (filed) cell.appendChild(filedCard(filed, row, kind));
+
     const pick = document.createElement('div');
     pick.className = 'signpick';
     const inp = document.createElement('input');
@@ -965,11 +972,39 @@ function uploadSlot (row, kind, filed, target, file) {
       ? 'Upload again to replace it \u2014 only the latest file is kept. PDF or image, up to 12 MB.'
       : 'Signed copy: one file, PDF or image, up to 12 MB.';
     pick.appendChild(hint);
+
+    if (filed) {
+      pick.hidden = true;
+      const swap = button('Replace file', 'ghost small', () => {
+        pick.hidden = false;
+        swap.hidden = true;
+        inp.focus();
+      });
+      swap.title = `Choose a new signed ${what} for ${who} \u2014 it replaces the one on file`;
+      cell.appendChild(swap);
+    }
     cell.appendChild(pick);
+    return cell;
   }
 
+  // a new file chosen over one on file: say which it is about to replace
   if (filed) cell.appendChild(onFileNote(filed, row, kind, true));
   return cell;
+}
+
+/** the signed copy on the record, drawn as done */
+function filedCard (filed, row, kind) {
+  const f = (filed.files || [])[0] || {};
+  const when = filed.created_at ? new Date(filed.created_at).toLocaleDateString() : '';
+  const by = filed.created_by || 'somebody';
+  const what = kind === 'advice' ? 'payment advice' : 'time sheet';
+  const card = signingDocument('\u2713 Signed copy uploaded',
+    [f.name, 'by ' + by + (when ? ' on ' + when : '')].filter(Boolean).join(' \u00b7 '), [
+      labelledIcon('view', 'View', `View the signed ${what} on file for ${row.consultant || ''}`,
+                   () => viewFiled(filed, row))
+    ]);
+  card.classList.add('signfiled');
+  return card;
 }
 
 /** the copy already on the record, and a way to look at it */

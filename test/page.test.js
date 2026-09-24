@@ -1030,6 +1030,16 @@ check('uploading again replaces the file, and the page says so',
   /a new upload replaces it when saved/.test(signingjs) &&
   /const before = copiesOnFile\(sub, kind\);[\s\S]{0,300}await dropSuperseded\(before, kept\);/
     .test(signingjs), true);
+/* A copy on the record is the answer, so it comes first and looks finished.
+   The file box sat on top of it, and a cell that opens with "Choose File"
+   reads as a job not done. Replacing it is one click away, behind a button
+   that says so. */
+check('a filed copy reads as done, and replacing it is asked for',
+  /if \(filed\) cell\.appendChild\(filedCard\(filed, row, kind\)\);/.test(signingjs) &&
+  /pick\.hidden = true;\s*const swap = button\('Replace file', 'ghost small'/.test(signingjs) &&
+  /function filedCard \(filed, row, kind\)/.test(signingjs) &&
+  /card\.classList\.add\('signfiled'\)/.test(signingjs) &&
+  /\.signfiled\{/.test(css), true);
 /* The PA asked to read the invoice where she prints the other two: it is
    the bill the payment advice pays. Read whenever there is one, downloaded
    once the HOD has approved it, and drawn as an invoice, not as a sheet. */
