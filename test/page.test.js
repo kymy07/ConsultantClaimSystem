@@ -1010,6 +1010,26 @@ check('and never on the strength of an empty cache',
 check('the note is on the PA’s tables and the Status table alike',
   /const dup = duplicateProfileNote\(name, \(\) => \{/.test(signingjs) &&
   /duplicateProfileNote\(name, \(\) => renderApprovals\(\)\)/.test(approvals), true);
+/* The PA asked to read the invoice where she prints the other two: it is
+   the bill the payment advice pays. Read whenever there is one, downloaded
+   once the HOD has approved it, and drawn as an invoice, not as a sheet. */
+check('the Download step has a line for the invoice',
+  /downloadLine\(name, month, 'claim', sub, ready\),\s*downloadLine\(name, month, 'invoice', null, ready\),\s*downloadLine\(name, month, 'advice', null, ready\)/
+    .test(signingjs) &&
+  /if \(kind === 'invoice'\) \{\s*const inv = monthInvoice\(name, month\.y, month\.m\);/.test(signingjs) &&
+  /labelledIcon\('view', 'View', `View the invoice for \$\{who\}`,\s*\(\) => reviewSubmission\(inv\.id\)\)/
+    .test(signingjs), true);
+check('and an invoice is drawn as an invoice',
+  /if \(kind === 'invoice'\) \{\s*return \{ blob: \(await buildInvoicePDF\(state\)\)/.test(signingjs), true);
+/* Download all saved one PDF after another, only the time sheets, and the
+   browser asked whether the page could save several files. It is one zip
+   now, of exactly what the page shows as ready. */
+check('Download all is one zip of everything ready on the page',
+  /const all = button\('Download all as zip', 'small', \(\) => downloadAllAsZip\(ready, all\)\)/
+    .test(signingjs) &&
+  /if \(collect\) collect\.push\(\{ sub: ready, kind: kind, name: name, month: month \}\)/.test(signingjs) &&
+  /saveAs\(zipFiles\(files\), zipName\)/.test(signingjs) &&
+  !/function downloadAllForSigning/.test(signingjs), true);
 /* Sending the month was two buttons on the heading of a table in the
    record. Whoever files the signed copies had to know the last part of
    their job lived on a page about the past, so it is a step of its own at

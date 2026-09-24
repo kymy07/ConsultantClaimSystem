@@ -502,35 +502,83 @@ async function renderSignDownload () {
     count.setAttribute('role', 'status');
     count.textContent = `${rows.length} time sheet${rows.length === 1 ? '' : 's'} ready to download for signing.`;
     host.appendChild(count);
-    const bar = document.createElement('div');
-    bar.className = 'btnrow';
-    const all = button(`Download all (${rows.length})`, 'small',
-                       () => downloadAllForSigning(rows, all));
-    bar.appendChild(all);
-    host.appendChild(bar);
   }
 
-  /* Two lines per person, because a month is two documents to print: the
-     time sheet the HOD signs, and the payment advice he signs with it. The
-     name is the same on both, so it is written once. */
+  /* Everything this page would hand over one button at a time, in one zip.
+     The button goes above the tables, and the tables are what fill it: each
+     line that offers Download puts its document on the list as it is drawn,
+     so the zip holds exactly what the page shows as ready — no more. */
+  const ready = [];
+  const bar = document.createElement('div');
+  bar.className = 'btnrow';
+  const all = button('Download all as zip', 'small', () => downloadAllAsZip(ready, all));
+  bar.appendChild(all);
+  host.appendChild(bar);
+
+  /* Three lines per person, one per document of the month: the time sheet
+     the HOD signs, the invoice it backs, and the payment advice he signs
+     with it. The name is the same on all three, so it is written once. */
   signingMonthTables(host, rows, ['Document', 'Status'], null, {
     roster: signingRoster(),
     fallbackMonth: currentSigningMonth(),
     lines: (name, sub, month) => [
-      downloadLine(name, month, 'claim', sub),
-      downloadLine(name, month, 'advice', null)
+      downloadLine(name, month, 'claim', sub, ready),
+      downloadLine(name, month, 'invoice', null, ready),
+      downloadLine(name, month, 'advice', null, ready)
     ]
   });
+
+  all.textContent = `Download all as zip (${ready.length})`;
+  all.disabled = !ready.length;
+  all.title = ready.length
+    ? 'Every document marked ready below, one folder per person'
+    : 'Nothing is ready to download yet';
+}
+
+/** where an invoice has got, in the words this page uses */
+function invoiceLineWords (inv) {
+  if (!inv) return 'Not submitted';
+  if (inv.status === 'complete') return 'Approved by HOD';
+  if (inv.status === 'returned') return 'Sent back';
+  return String((typeof STATUS_TEXT === 'object' && STATUS_TEXT[inv.status]) || inv.status);
 }
 
 /** one document of one person's month: what it is, and where it has got */
-function downloadLine (name, month, kind, claim) {
+function downloadLine (name, month, kind, claim, collect) {
   /* `month.m` is the month the API numbers from one, as every other table
      here reads it. Treating it as a JavaScript month index looked for
      October's records under September and found nobody. */
   const where = { consultant: name, period_year: month.y, period_month: month.m };
   const who = `${name || 'consultant'}, ${MONTHS[Math.max(0, month.m - 1)]} ${month.y}`;
-  const label = kind === 'advice' ? 'Payment Advice' : 'Time sheet';
+  const label = kind === 'advice' ? 'Payment Advice'
+    : kind === 'invoice' ? 'Invoice' : 'Time sheet';
+
+  /* The invoice is read, not signed: it carries one signature, the
+     consultant's, and it finishes at the HOD. It is here so the PA can see
+     the bill the payment advice pays without going to another page for it —
+     View whenever there is one, Download once the HOD has approved it. */
+  if (kind === 'invoice') {
+    const inv = monthInvoice(name, month.y, month.m);
+    const words = invoiceLineWords(inv);
+    if (!inv) {
+      const none = signingDocument(label, 'Not submitted yet', []);
+      none.classList.add('signdoc-quiet');
+      return [none, statusBadge(words)];
+    }
+    const look = labelledIcon('view', 'View', `View the invoice for ${who}`,
+                              () => reviewSubmission(inv.id));
+    if (inv.status !== 'complete') {
+      const quiet = signingDocument(label, inv.invoice_no || 'Not approved yet', [look]);
+      quiet.classList.add('signdoc-quiet');
+      return [quiet, statusBadge(words)];
+    }
+    if (collect) collect.push({ sub: inv, kind: 'invoice', name: name, month: month });
+    return [signingDocument(label, inv.invoice_no || '', [
+      look,
+      labelledIcon('download', 'Download', `Download the invoice for ${who}`,
+                   control => downloadForSigning(inv, control, 'invoice'))
+    ]), statusBadge(words)];
+  }
 
   /* Printable once the HOD has approved it, and still printable after the
      month is closed: a copy can be needed late, or again. What is not
@@ -575,6 +623,7 @@ function downloadLine (name, month, kind, claim) {
     return [quiet, statusBadge(words)];
   }
 
+  if (collect) collect.push({ sub: ready, kind: kind, name: name, month: month });
   return [signingDocument(label, ready.invoice_no || '', [
     labelledIcon('view', 'View', `View the ${label.toLowerCase()} for ${who}`,
                  control => view(ready, control)),
@@ -601,6 +650,11 @@ async function signingPdf (sub, as) {
   const full = await Sync.submission(sub.id);
   if (!full || !full.data) throw new Error('That document could not be read.');
   const state = mergeDefaults(full.data);
+  // a bill is drawn as a bill; everything else that reaches here is a sheet
+  if (kind === 'invoice') {
+    return { blob: (await buildInvoicePDF(state)).output('blob'),
+             name: invoiceFileBase(state) + '.pdf' };
+  }
   return { blob: (await buildClaimPDF(state)).output('blob'), name: claimFileBase(state) + '.pdf' };
 }
 
@@ -626,34 +680,57 @@ async function downloadForSigning (sub, btn, as) {
   }
 }
 
-async function downloadAllForSigning (rows, btn) {
-  if (signingBusy) return;
+/**
+ * Every document the page shows as ready, as one zip: a folder per person,
+ * and a folder per month above them when the page spans more than one.
+ *
+ * It used to save one PDF after another, and a browser asked whether the
+ * page could save several files — say no by accident and half of them went
+ * nowhere. It also only took the time sheets. One archive has neither
+ * problem.
+ */
+async function downloadAllAsZip (ready, btn) {
+  if (signingBusy || !ready.length) return;
   signingBusy = true;
   const was = btn.textContent;
   btn.disabled = true;
-  let saved = 0;
+  btn.setAttribute('aria-busy', 'true');
+  const files = [];
   const failed = [];
+  const months = new Set(ready.map(r => `${r.month.y}-${r.month.m}`));
   try {
-    for (let i = 0; i < rows.length; i++) {
-      btn.textContent = `Downloading ${i + 1} of ${rows.length}…`;
+    for (let i = 0; i < ready.length; i++) {
+      const r = ready[i];
+      btn.textContent = `Preparing ${i + 1} of ${ready.length}…`;
       try {
-        const pdf = await signingPdf(rows[i]);
-        saveAs(pdf.blob, pdf.name);
-        saved++;
-        // the browser needs a breath between saves, or it drops some
-        await new Promise(res => setTimeout(res, 250));
+        const pdf = await signingPdf(r.sub, r.kind);
+        const person = safeFile(r.name) || 'Consultant';
+        const folder = months.size > 1
+          ? safeFile(monthFolder({ period_year: r.month.y, period_month: r.month.m })) + '/' + person
+          : person;
+        files.push({ name: folder + '/' + pdf.name,
+                     bytes: new Uint8Array(await pdf.blob.arrayBuffer()) });
       } catch (err) {
-        failed.push(`${rows[i].consultant || rows[i].id}: ${err.message}`);
+        failed.push(`${r.name}: ${err.message}`);
       }
+    }
+    if (files.length) {
+      const only = ready[0].month;
+      const zipName = months.size > 1
+        ? 'Documents for signing.zip'
+        : safeFile('Documents for signing - ' +
+                   monthFolder({ period_year: only.y, period_month: only.m })) + '.zip';
+      saveAs(zipFiles(files), zipName);
     }
   } finally {
     signingBusy = false;
     btn.disabled = false;
+    btn.removeAttribute('aria-busy');
     btn.textContent = was;
   }
   toast(failed.length
-    ? `${saved} saved. ${failed.length} could not be: ${failed[0]}`
-    : `${saved} file${saved === 1 ? '' : 's'} saved to your Downloads folder.`, !!failed.length);
+    ? `${files.length} in the zip. ${failed.length} could not be drawn: ${failed[0]}`
+    : `${files.length} document${files.length === 1 ? '' : 's'} saved as one zip.`, !!failed.length);
 }
 
 /* -------------------------------------------------------------------
@@ -709,8 +786,8 @@ async function renderSignUpload () {
     empty.textContent = 'All signed copies are filed. You can replace a scan below.';
     host.appendChild(empty);
   }
-  /* Two lines per person, the same two the Download page prints: the signed
-     time sheet and the signed payment advice, each against the month it
+  /* Two lines per person, the two the HOD signs on the Download page: the
+     signed time sheet and the signed payment advice, each against the month it
      belongs to. Only the signed copies are asked for here — the unsigned
      forms are on the Download page, and a column of them on this one was a
      column nobody clicked. */
