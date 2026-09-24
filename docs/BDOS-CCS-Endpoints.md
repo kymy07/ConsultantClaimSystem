@@ -273,7 +273,7 @@ thing was being set up, which look exactly like real ones and sit in somebody's 
 ever. CCS shows the button to the `admin` and to nobody else, names the document, the month and
 the number in the confirmation, and says plainly when the route is not there yet.
 
-**`POST /ccs/submissions/{id}/action`** body: `{ "action": "approve" | "return" | "resubmit",
+**`POST /ccs/submissions/{id}/action`** body: `{ "action": "approve" | "return" | "resubmit" | "reopen",
 "note": "…", "data": { … } }`.
 
 `data` is optional and is the whole form again — a step that signs sends the sheet back with the
@@ -281,6 +281,12 @@ signature in it, so BDOS never has to know where inside that object a signature 
 `resubmit` sends it too, and that one matters: a document that came back and was fixed has to
 carry the fix, or the approver is handed the very document they rejected. `note` is
 required by CCS on a `return`, since it is the only thing the consultant is told.
+
+**`reopen` takes a closed month back to the PA.** It moves a `complete` time sheet or payment
+advice back to `pending_signature` — where it was before the PA closed it — so a signed copy can be
+added or replaced, and approving closes it again. The `pa` and the `admin` may do it; an invoice
+never is, because it finishes at the HOD and has nothing on paper to add. `409` when the row is not
+`complete`. The note says why, and goes into `history` with who did it.
 
 **The `admin` acts at any stage**, including `resubmit` on a row it did not create. This is the
 row in the table above spelled out for this endpoint: the office prepares claims for people, and a

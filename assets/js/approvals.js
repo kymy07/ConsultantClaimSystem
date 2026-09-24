@@ -1176,7 +1176,9 @@ const ICON_PATHS = {
   /* an arrow into a tray — take a copy away */
   download: 'M8 2.6v6.9|M5.2 7.1 8 9.9l2.8-2.8|M2.8 11.4v1.1a1 1 0 0 0 1 1h8.4a1 1 0 0 0 1-1v-1.1',
   /* a bin — take it off the record altogether */
-  remove: 'M3.2 4.6h9.6|M6.4 4.6V3.4a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2|M4.4 4.6l.5 7.6a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.5-7.6|M6.9 7v3.6|M9.1 7v3.6'
+  remove: 'M3.2 4.6h9.6|M6.4 4.6V3.4a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2|M4.4 4.6l.5 7.6a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.5-7.6|M6.9 7v3.6|M9.1 7v3.6',
+  /* an open padlock — a closed month taken back to be worked on */
+  unlock: 'M3.6 7.4h8.8a.8.8 0 0 1 .8.8v4.6a.8.8 0 0 1-.8.8H3.6a.8.8 0 0 1-.8-.8V8.2a.8.8 0 0 1 .8-.8Z|M5.2 7.4V5.2a2.8 2.8 0 0 1 5.5-.8|M8 9.8v1.2'
 };
 
 /**

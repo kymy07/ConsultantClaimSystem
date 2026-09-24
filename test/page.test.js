@@ -460,7 +460,17 @@ check('a copy is filed the moment it is chosen, and the months stay open',
   !/button\('Save', 'ghost'/.test(signingjs) && !/function saveSigned/.test(signingjs) &&
   /: filed \? 'Done'/.test(signingjs) &&
   /async function fileSignedCopy[\s\S]{0,1400}await Sync\.store\(/.test(signingjs) &&
-  (signingjs.match(/Sync\.act\(/g) || []).length === 1, true);
+  (signingjs.match(/Sync\.act\(sub\.id, 'approve'/g) || []).length === 1, true);
+/* A closed month can be opened again — one more copy turns up, or a scan was
+   the wrong page — by the PA or the administrator, from History, with a
+   reason kept in the record. It goes back to the signing stage and Submit
+   closes it again; an invoice is never reopened. */
+check('a closed month can be reopened from History, with a reason',
+  /if \(Auth\.places\(\) && closedInMonth\(rec\)\.length\)/.test(signingjs) &&
+  /filedAction\('unlock', 'Reopen month',/.test(signingjs) &&
+  /await Sync\.act\(sub\.id, 'reopen', why\.trim\(\)/.test(signingjs) &&
+  /\(kindOf\(s\) === 'claim' \|\| kindOf\(s\) === 'advice'\) && s\.status === 'complete'/.test(signingjs) &&
+  /"reopen"/.test(fs.readFileSync(path.join(ROOT, 'docs/BDOS-CCS-Endpoints.md'), 'utf8')), true);
 /* And Submit is not offered until nothing on the page is still waiting for
    a copy — chosen or already filed, every document that can have one has
    one. Green is the answer to "is this ready?" before the words are read. */

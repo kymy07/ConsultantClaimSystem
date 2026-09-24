@@ -1381,6 +1381,69 @@ async function renderFiled () {
   host.appendChild(filedTable(pairs));
 }
 
+/** the documents of one person's month that are closed and can be opened again */
+function closedInMonth (rec) {
+  const who = String(rec.consultant || '').trim();
+  return signingSubs.filter(s =>
+    (kindOf(s) === 'claim' || kindOf(s) === 'advice') && s.status === 'complete' &&
+    String(s.consultant || '').trim() === who &&
+    Number(s.period_year) === Number(rec.period_year) &&
+    Number(s.period_month) === Number(rec.period_month));
+}
+
+/**
+ * Take a closed month back to Re-Upload.
+ *
+ * Closing is the PA saying a month is done, and sometimes it is not quite:
+ * one more copy turns up, or a scan was the wrong page. A closed month could
+ * not move at all. Now its time sheet and payment advice go back to the
+ * signing stage — exactly where they were before Submit — the signed copies
+ * already on file stay where they are, and Submit closes it again. Why it was
+ * reopened is asked for and kept in the record, next to who did it.
+ */
+async function reopenMonth (rec, control) {
+  if (signingBusy) return;
+  const who = String(rec.consultant || '').trim();
+  const month = monthFolder(rec);
+  const closed = closedInMonth(rec);
+  if (!closed.length) { toast(`Nothing in ${who}'s ${month} is closed.`, true); return; }
+
+  const why = window.prompt(
+    `Reopen ${who} \u2014 ${month}?\n\n` +
+    'It goes back to Re-Upload, where a signed copy can be added or replaced. ' +
+    'Submit closes it again.\n\nWhy is it being reopened? (kept in the record)', '');
+  if (why === null) return;
+
+  signingBusy = true;
+  control.disabled = true;
+  control.setAttribute('aria-busy', 'true');
+  let done = 0;
+  const failed = [];
+  try {
+    for (const sub of closed) {
+      try {
+        await Sync.act(sub.id, 'reopen', why.trim() || 'Reopened to add or replace a signed copy');
+        done++;
+      } catch (err) {
+        failed.push(kindLabel(kindOf(sub)) + ': ' +
+          (err.status === 403 ? 'this account may not reopen it'
+            : err.status === 400 ? 'the server cannot reopen a month yet'
+              : err.status === 409 ? 'it is not closed any more'
+                : (err.message || 'could not be reopened')));
+      }
+    }
+  } finally {
+    signingBusy = false;
+    control.disabled = false;
+    control.removeAttribute('aria-busy');
+  }
+  toast(failed.length
+    ? `${done} reopened. ${failed[0]}.`
+    : `${who} \u2014 ${month} is open again. Add or replace its signed copies on Re-Upload.`,
+    !!failed.length);
+  await renderFiled();
+}
+
 /** one document in a filed month: what it is, where it came from, and what can be done with it */
 function filedDocument (title, meta, actions, fileName, quiet) {
   const item = document.createElement('div');
@@ -1529,6 +1592,15 @@ function filedTable (pairs) {
     const wholeRow = document.createElement('div');
     wholeRow.className = 'history-document-actions filedmonthzip';
     wholeRow.appendChild(whole);
+    /* A closed month can be opened again, to add a copy or put one right.
+       Offered only while something in it is closed — once it is open, the
+       place to work on it is Re-Upload. */
+    if (Auth.places() && closedInMonth(rec).length) {
+      const again = filedAction('unlock', 'Reopen month',
+        'Reopen ' + label + ' to add or replace a signed copy',
+        control => reopenMonth(rec, control));
+      wholeRow.appendChild(again);
+    }
     copy.appendChild(wholeRow);
     row.appendChild(copy);
 
