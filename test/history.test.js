@@ -90,6 +90,9 @@ adminNow = false;
    assert.equal(vm.runInContext(`(archiveFor('Nizar', 2026, 8, '${kind}') || {}).kind`, ctx),
                 kind === 'claim' ? 'claim' : undefined, kind));
  assert.ok(!vm.runInContext("historyRows().some(r => r.kind === 'bank')", ctx));
+ // nor on the Status step's list of signed copies
+ const paintSrc = fs.readFileSync('assets/js/archive.js','utf8').split('function paintArchive')[1].split('\nfunction ')[0];
+ assert.ok(paintSrc.includes('.filter(r => r.kind !== BANK_KIND)'));
 
  // who is offered the upload: the consultant and the administrator, nobody else
  const offers = () => icons0(ctx.bankCell('Nizar', {period_year:2026, period_month:9}));

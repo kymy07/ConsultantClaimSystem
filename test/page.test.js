@@ -461,6 +461,16 @@ check('a copy is filed the moment it is chosen, and the months stay open',
   /: filed \? 'Done'/.test(signingjs) &&
   /async function fileSignedCopy[\s\S]{0,1400}await Sync\.store\(/.test(signingjs) &&
   (signingjs.match(/Sync\.act\(sub\.id, 'approve'/g) || []).length === 1, true);
+/* A filed copy can be taken off the record from History — by whoever filed it,
+   or the administrator, which is exactly what BDOS allows. The approved
+   invoice is the document itself, not a filed file, so it has no Remove. */
+check('a filed copy can be removed from History by whoever may',
+  /function removeFiled \(r, what\) \{[\s\S]{0,200}if \(!Auth\.isAdmin\(\) && !mine\) return \[\];/.test(signingjs) &&
+  /\.concat\(removeFiled\(rec, 'the signed time sheet for ' \+ label\)\)/.test(signingjs) &&
+  /\.concat\(removeFiled\(adv, 'the signed payment advice for ' \+ label\)\)/.test(signingjs) &&
+  /\.concat\(removeFiled\(bank, 'the bank statement for ' \+ label\)\)/.test(signingjs) &&
+  !/removeFiled\(inv/.test(signingjs) &&
+  /deleteStored\(r, async \(\) => \{/.test(signingjs), true);
 /* A closed month can be opened again — one more copy turns up, or a scan was
    the wrong page — by the PA or the administrator, from History, with a
    reason kept in the record. It goes back to the signing stage and Submit

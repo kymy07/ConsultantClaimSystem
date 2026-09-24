@@ -170,6 +170,8 @@ function paintArchive () {
 
   const rows = latestCopies(archive)
     .filter(r => Number(r.period_year) === when.y && Number(r.period_month) === when.m + 1)
+    // signed copies only: a bank statement is proof of payment, and lives in History
+    .filter(r => r.kind !== BANK_KIND)
     // a consultant sees their own filed copies, the way they see their own rows
     .filter(r => Auth.seesEveryone() ||
                  String(r.consultant || '').trim() === String(S.consultant.name || '').trim())
@@ -958,7 +960,8 @@ async function deleteStored (r, after) {
   if (archiveBusy) return;
   const m = Number(r.period_month) || 0;
   const when = `${MONTHS[Math.max(0, m - 1)]} ${r.period_year || ''}`.trim();
-  const what = (r.kind && typeof kindLabel === 'function' ? kindLabel(r.kind) : 'signed copy').toLowerCase();
+  const what = r.kind === BANK_KIND ? 'bank statement'
+    : (r.kind && typeof kindLabel === 'function' ? kindLabel(r.kind) : 'signed copy').toLowerCase();
   if (!confirm(
     `Delete the ${what} on file for ${when}?\n\n` +
     `${String(r.consultant || 'somebody').trim()}${r.invoice_no ? ' \u00b7 ' + r.invoice_no : ''}\n\n` +

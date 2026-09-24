@@ -1550,6 +1550,31 @@ function filedDocument (title, meta, actions, fileName, quiet) {
   return item;
 }
 
+/**
+ * Remove, for a copy this account may take off the record: the one it filed
+ * itself, or any, for the administrator — BDOS allows exactly that, so the
+ * button is not offered where it would be refused. The PA does not see it on
+ * a consultant's bank statement. The approved invoice has none: it is not a
+ * filed file but the approved document itself, and taking it away is a
+ * delete on the Status step, for the administrator.
+ *
+ * A copy removed from a month that is closed leaves nothing to upload
+ * against until the month is reopened, so the page says so.
+ */
+function removeFiled (r, what) {
+  const mine = String(r.created_by || '').toLowerCase() === myEmail();
+  if (!Auth.isAdmin() && !mine) return [];
+  const b = filedAction('remove', 'Remove', 'Remove ' + what + ' from the record',
+    () => deleteStored(r, async () => {
+      await renderFiled();
+      if (closedInMonth(r).length) {
+        toast('Removed. Reopen the month to upload a new copy on Re-Upload.');
+      }
+    }));
+  b.classList.add('danger');
+  return [b];
+}
+
 /** an icon button with its word beside it, as the History tables draw them */
 function filedAction (icon, word, label, onClick) {
   const b = iconButton(icon, label, 'ghost small history-icon', onClick);
@@ -1624,7 +1649,8 @@ function filedTable (pairs) {
       [filedAction('view', 'View', 'View the signed time sheet for ' + label,
                    () => viewStored(rec, when.textContent)),
        filedAction('download', 'Download', 'Download the signed time sheet for ' + label,
-                   control => saveStored(rec, control))],
+                   control => saveStored(rec, control))]
+        .concat(removeFiled(rec, 'the signed time sheet for ' + label)),
       (rec.files || [])[0] && rec.files[0].name));
 
     // the invoice: approved in the app, nothing was scanned
@@ -1647,7 +1673,8 @@ function filedTable (pairs) {
           [filedAction('view', 'View', 'View the signed payment advice for ' + label,
                        () => viewStored(adv, when.textContent)),
            filedAction('download', 'Download', 'Download the signed payment advice for ' + label,
-                       control => saveStored(adv, control))],
+                       control => saveStored(adv, control))]
+            .concat(removeFiled(adv, 'the signed payment advice for ' + label)),
           (adv.files || [])[0] && adv.files[0].name)
       : filedDocument('Payment Advice', 'signed copy not filed yet', [], '', true));
 
@@ -1661,7 +1688,8 @@ function filedTable (pairs) {
           [filedAction('view', 'View', 'View the bank statement for ' + label,
                        () => viewStored(bank, when.textContent)),
            filedAction('download', 'Download', 'Download the bank statement for ' + label,
-                       control => saveStored(bank, control))],
+                       control => saveStored(bank, control))]
+            .concat(removeFiled(bank, 'the bank statement for ' + label)),
           (bank.files || [])[0] && bank.files[0].name)
       : filedDocument('Bank Statement', 'not uploaded by the consultant yet', [], '', true));
 
